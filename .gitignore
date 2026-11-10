@@ -1,0 +1,43 @@
+# 本地配置与密钥
+.env
+.env.*
+!.env.example
+!.env.*.example
+
+# Python 环境与缓存
+.venv/
+venv/
+.conda/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Node.js 依赖与构建产物
+node_modules/
+dist/
+staticfiles/
+coverage/
+*.log
+
+# 本地数据库与用户上传
+*.sqlite3
+*.sqlite3-*
+chat.db
+chat.db-*
+
+
+# 编辑器与系统临时文件
+.vscode/
+.idea/
+.DS_Store
+._*
+~$*
+
+# Word 文档与 PDF
+*.[dD][oO][cC][xX]
+*.[pP][dD][fF]
+
