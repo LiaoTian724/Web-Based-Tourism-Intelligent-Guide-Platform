@@ -8,9 +8,30 @@ from django.views.decorators.http import require_GET
 
 from .models import ListingKind, LocalListing, ReviewStatus
 
+from django.contrib.staticfiles.storage import staticfiles_storage
+from .discovery_photos import PHOTO_CREDITS, SVG_IMAGE_KEYS
+
 
 def listing_to_dict(item, bookmarked_ids):
     """Convert one LocalListing record into the frontend JSON format."""
+    # 生成图片 URL
+    image_url = ""
+
+    if item.image_key:
+        extension = (
+            "svg"
+            if item.image_key in SVG_IMAGE_KEYS
+            else "webp"
+        )
+
+        image_url = staticfiles_storage.url(
+            f"discovery/{item.image_key}.{extension}"
+        )
+
+    # 获取图片版权信息
+    image_credit = PHOTO_CREDITS.get(item.image_key)
+
+
     destination = item.address or item.name
 
     if not item.address and item.latitude is not None and item.longitude is not None:
@@ -23,6 +44,9 @@ def listing_to_dict(item, bookmarked_ids):
             "destination": destination,
             "travelmode": "walking",
         })
+
+    image_credit = PHOTO_CREDITS.get(item.image_key)
+    extension = "webp" if image_credit else "svg"
 
     return {
         "id": item.pk,
@@ -44,6 +68,8 @@ def listing_to_dict(item, bookmarked_ids):
         "image_key": item.image_key,
         "bookmarked": item.pk in bookmarked_ids,
         "navigation_url": navigation_url,
+        "image_url": image_url,
+        "image_credit": image_credit,
     }
 
 

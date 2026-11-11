@@ -1,9 +1,12 @@
 <script setup>
 import { ref, onMounted, computed } from 'vue'
 import AttractionMap from './components/AttractionMap.vue'
+import LocalListings from './components/LocalListings.vue'
 
 // 景点数据
 const attractions = ref([])
+const activePage = ref('attractions')
+
 
 // 搜索条件
 const keyword = ref('')
@@ -108,126 +111,139 @@ onMounted(loadAttractions)
                 </div>
             </div>
 
-            <div class="header-right">探索澳门 · 感受文化</div>
+            <nav class="main-nav">
+                <button
+                    :class="{ active: activePage === 'attractions' }"
+                    @click="activePage = 'attractions'"
+                >景点探索</button>
+
+                <button
+                    :class="{ active: activePage === 'discovery' }"
+                    @click="activePage = 'discovery'"
+                >美食与文创</button>
+            </nav>
         </header>
 
         <main class="container">
 
             <section class="hero">
                 <p class="eyebrow">DISCOVER MACAO</p>
+                <h1 v-if="activePage === 'attractions'">在澳门，发现城市的另一面。</h1>
 
-                <h1>在澳门，发现城市的另一面。</h1>
+                <h1 v-else>从街头味道到澳门手信。</h1>
 
-                <p>
-                    从世界文化遗产到城市街巷，
-                    探索澳门独特的历史、文化与生活。
-                </p>
+                <p v-if="activePage === 'attractions'">从世界文化遗产到城市街巷，探索澳门独特的历史、文化与生活。</p>
+
+                <p v-else>从街头美食到特色手信，发现澳门独特的本地生活与城市风味。</p>
             </section>
 
             <!-- 搜索和筛选 -->
-            <section class="search-panel">
+            <template v-if="activePage === 'attractions'">
+                <section class="search-panel">
 
-                <form @submit.prevent="loadAttractions">
-                    <label><span>搜索景点</span>
-                        <input v-model="keyword" type="search" placeholder="输入景点名称、英文名称或地址" />
-                    </label>
+                    <form @submit.prevent="loadAttractions">
+                        <label><span>搜索景点</span>
+                            <input v-model="keyword" type="search" placeholder="输入景点名称、英文名称或地址" />
+                        </label>
 
-                    <label>
-                        <span>选择区域</span>
-                        <select v-model="region">
-                            <option v-for="item in regions" :key="item.value" :value="item.value">{{ item.label }}</option>
-                        </select>
-                    </label>
+                        <label>
+                            <span>选择区域</span>
+                            <select v-model="region">
+                                <option v-for="item in regions" :key="item.value" :value="item.value">{{ item.label }}</option>
+                            </select>
+                        </label>
 
-                    <label>
-                        <span>选择分类</span>
-                        <select v-model="category">
-                            <option v-for="item in categories" :key="item.value" :value="item.value">{{ item.label }}</option>
-                        </select>
-                    </label>
+                        <label>
+                            <span>选择分类</span>
+                            <select v-model="category">
+                                <option v-for="item in categories" :key="item.value" :value="item.value">{{ item.label }}</option>
+                            </select>
+                        </label>
 
-                    <div class="actions">
-                        <button type="submit">搜索</button>
-                        <button type="button" class="reset" @click="resetFilters">重置</button>
-                    </div>
-                </form>
+                        <div class="actions">
+                            <button type="submit">搜索</button>
+                            <button type="button" class="reset" @click="resetFilters">重置</button>
+                        </div>
+                    </form>
 
-            </section>
-            
-            <!-- 澳门地图 -->
-            <section class="map-section">
-                <div class="section-title">
-                    <div>
-                        <p>MACAO MAP</p>
-                        <h2>地图探索</h2>
-                    </div>
+                </section>
 
-                    <span>点击地图标记查看景点</span>
-                </div>
-
-                <AttractionMap  :places="attractions"  :selected-id="selectedId"  @select="selectAttraction"/>
-
-                <!-- 当前选中的景点 -->
-                <div v-if="selectedPlace" class="selected-place">
-                    <div>
-                        <strong>{{ selectedPlace.name }}</strong>
-                        <p>{{ selectedPlace.address }}</p>
-                    </div>
-
-                    <div class="selected-actions">
-                        <a :href="googleMapsUrl(selectedPlace)" target="_blank" rel="noopener noreferrer">Google Maps 导航 ↗</a>
-                        <button type="button" class="reset" @click="selectedId = null">取消选择</button>
-                    </div>
-                </div>
-
-            </section>
-
-            <!-- 景点列表 -->
-            <section class="results">
-                <div class="section-title">
-                    <div>
-                        <p>THE ATTRACTIONS</p>
-                        <h2>探索景点</h2>
-                    </div>
-
-                    <span>{{ attractions.length }} 个景点</span>
-                </div>
-
-                <div v-if="loading" class="message">正在加载景点...</div>
-
-                <div v-else-if="error" class="message error">{{ error }}</div>
-
-                <div v-else-if="attractions.length" class="card-grid">
-                    <article v-for="place in attractions"  :key="place.id"  :class="['place-card', {selected: selectedId === place.id}]">
-                        <div class="card-tags">
-                            <span class="category">{{ place.category_label }}</span>
-                            <span>{{ place.region_label }}</span>
+                <!-- 澳门地图 -->
+                <section class="map-section">
+                    <div class="section-title">
+                        <div>
+                            <p>MACAO MAP</p>
+                            <h2>地图探索</h2>
                         </div>
 
-                        <h3>{{ place.name }}</h3>
+                        <span>点击地图标记查看景点</span>
+                    </div>
 
-                        <p v-if="place.name_en" class="english">{{ place.name_en }}</p>
+                    <AttractionMap  :places="attractions"  :selected-id="selectedId"  @select="selectAttraction"/>
 
-                        <p class="summary">{{ place.summary }}</p>
-
-                        <div class="details">
-                            <p><span>地址</span>{{ place.address }}</p>
-                            <p><span>开放时间</span>{{ place.hours }}</p>
-                            <p><span>门票</span>{{ place.admission }}</p>
+                    <!-- 当前选中的景点 -->
+                    <div v-if="selectedPlace" class="selected-place">
+                        <div>
+                            <strong>{{ selectedPlace.name }}</strong>
+                            <p>{{ selectedPlace.address }}</p>
                         </div>
 
-                        <div class="card-footer">
-                            <span>{{ place.visit_minutes }} 分钟</span>
-                            <span v-if="place.world_heritage">世界遗产</span>
-                            <span v-if="place.less_known">小众景点</span>
-                             <button type="button" class="map-select"  @click="selectAttraction(place.id)">地图定位</button>
+                        <div class="selected-actions">
+                            <a :href="googleMapsUrl(selectedPlace)" target="_blank" rel="noopener noreferrer">Google Maps 导航 ↗</a>
+                            <button type="button" class="reset" @click="selectedId = null">取消选择</button>
                         </div>
-                    </article>
-                </div>
+                    </div>
 
-                <div v-else class="message">暂时没有找到景点，请调整搜索条件。</div>
-            </section>
+                </section>
 
+                <!-- 景点列表 -->
+                <section class="results">
+                    <div class="section-title">
+                        <div>
+                            <p>THE ATTRACTIONS</p>
+                            <h2>探索景点</h2>
+                        </div>
+
+                        <span>{{ attractions.length }} 个景点</span>
+                    </div>
+
+                    <div v-if="loading" class="message">正在加载景点...</div>
+
+                    <div v-else-if="error" class="message error">{{ error }}</div>
+
+                    <div v-else-if="attractions.length" class="card-grid">
+                        <article v-for="place in attractions"  :key="place.id"  :class="['place-card', {selected: selectedId === place.id}]">
+                            <div class="card-tags">
+                                <span class="category">{{ place.category_label }}</span>
+                                <span>{{ place.region_label }}</span>
+                            </div>
+
+                            <h3>{{ place.name }}</h3>
+
+                            <p v-if="place.name_en" class="english">{{ place.name_en }}</p>
+
+                            <p class="summary">{{ place.summary }}</p>
+
+                            <div class="details">
+                                <p><span>地址</span>{{ place.address }}</p>
+                                <p><span>开放时间</span>{{ place.hours }}</p>
+                                <p><span>门票</span>{{ place.admission }}</p>
+                            </div>
+
+                            <div class="card-footer">
+                                <span>{{ place.visit_minutes }} 分钟</span>
+                                <span v-if="place.world_heritage">世界遗产</span>
+                                <span v-if="place.less_known">小众景点</span>
+                                <button type="button" class="map-select"  @click="selectAttraction(place.id)">地图定位</button>
+                            </div>
+                        </article>
+                    </div>
+
+                    <div v-else class="message">暂时没有找到景点，请调整搜索条件。</div>
+                </section>
+            </template>
+
+            <LocalListings v-else :attractions="attractions"/>
         </main>
 
         <footer>澳門漫遊 · MACAO CULTURAL GUIDE</footer>
