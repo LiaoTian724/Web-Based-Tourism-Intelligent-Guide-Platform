@@ -11,6 +11,10 @@ npm run dev
 
 
 
+
+
+
+
 python -m pip install "Django==6.1.3"
 
 python -m django startproject djangovue .
@@ -22,3 +26,6 @@ cd /Volumes/E_disk/Project/MACAU_TOURISM_DESIGN
 npm create vite@latest frontend -- --template vue
 cd frontend
 npm install
+
+
+npm install leaflet@1.9.4

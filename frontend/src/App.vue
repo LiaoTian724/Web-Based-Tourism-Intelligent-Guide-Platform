@@ -1,5 +1,6 @@
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, computed } from 'vue'
+import AttractionMap from './components/AttractionMap.vue'
 
 // 景点数据
 const attractions = ref([])
@@ -30,6 +31,23 @@ const categories = [
     { value: 'food', label: '美食体验' }
 ]
 
+// 当前选中的景点
+const selectedId = ref(null)
+
+// 根据 ID 找到景点
+const selectedPlace = computed(() => {
+    return attractions.value.find(place => place.id === selectedId.value) || null
+})
+
+// 选择景点
+function selectAttraction(id) {selectedId.value = id}
+
+// Google Maps 导航
+function googleMapsUrl(place) {
+    return `https://www.google.com/maps/search/?api=1&query=${place.lat},${place.lng}`
+}
+
+
 // 从 Django 获取景点
 async function loadAttractions() {
     loading.value = true
@@ -52,6 +70,11 @@ async function loadAttractions() {
         const data = await response.json()
 
         attractions.value = data.items || []
+
+        // 如果筛选后景点不存在，清除原来的选择
+        if (!attractions.value.some(place => place.id === selectedId.value)) {
+            selectedId.value = null
+        }
     } catch (err) {
         error.value = err.message || '获取景点失败'
     } finally {
@@ -105,28 +128,21 @@ onMounted(loadAttractions)
             <section class="search-panel">
 
                 <form @submit.prevent="loadAttractions">
-
-                    <label>
-                        <span>搜索景点</span>
-
+                    <label><span>搜索景点</span>
                         <input v-model="keyword" type="search" placeholder="输入景点名称、英文名称或地址" />
                     </label>
 
                     <label>
                         <span>选择区域</span>
-
                         <select v-model="region">
-                            <option v-for="item in regions" :key="item.value" :value="item.value">{{ item.label }}
-                            </option>
+                            <option v-for="item in regions" :key="item.value" :value="item.value">{{ item.label }}</option>
                         </select>
                     </label>
 
                     <label>
                         <span>选择分类</span>
-
                         <select v-model="category">
-                            <option v-for="item in categories" :key="item.value" :value="item.value">{{ item.label }}
-                            </option>
+                            <option v-for="item in categories" :key="item.value" :value="item.value">{{ item.label }}</option>
                         </select>
                     </label>
 
@@ -134,14 +150,40 @@ onMounted(loadAttractions)
                         <button type="submit">搜索</button>
                         <button type="button" class="reset" @click="resetFilters">重置</button>
                     </div>
-
                 </form>
+
+            </section>
+            
+            <!-- 澳门地图 -->
+            <section class="map-section">
+                <div class="section-title">
+                    <div>
+                        <p>MACAO MAP</p>
+                        <h2>地图探索</h2>
+                    </div>
+
+                    <span>点击地图标记查看景点</span>
+                </div>
+
+                <AttractionMap  :places="attractions"  :selected-id="selectedId"  @select="selectAttraction"/>
+
+                <!-- 当前选中的景点 -->
+                <div v-if="selectedPlace" class="selected-place">
+                    <div>
+                        <strong>{{ selectedPlace.name }}</strong>
+                        <p>{{ selectedPlace.address }}</p>
+                    </div>
+
+                    <div class="selected-actions">
+                        <a :href="googleMapsUrl(selectedPlace)" target="_blank" rel="noopener noreferrer">Google Maps 导航 ↗</a>
+                        <button type="button" class="reset" @click="selectedId = null">取消选择</button>
+                    </div>
+                </div>
 
             </section>
 
             <!-- 景点列表 -->
             <section class="results">
-
                 <div class="section-title">
                     <div>
                         <p>THE ATTRACTIONS</p>
@@ -156,7 +198,7 @@ onMounted(loadAttractions)
                 <div v-else-if="error" class="message error">{{ error }}</div>
 
                 <div v-else-if="attractions.length" class="card-grid">
-                    <article v-for="place in attractions" :key="place.id" class="place-card">
+                    <article v-for="place in attractions"  :key="place.id"  :class="['place-card', {selected: selectedId === place.id}]">
                         <div class="card-tags">
                             <span class="category">{{ place.category_label }}</span>
                             <span>{{ place.region_label }}</span>
@@ -178,6 +220,7 @@ onMounted(loadAttractions)
                             <span>{{ place.visit_minutes }} 分钟</span>
                             <span v-if="place.world_heritage">世界遗产</span>
                             <span v-if="place.less_known">小众景点</span>
+                             <button type="button" class="map-select"  @click="selectAttraction(place.id)">地图定位</button>
                         </div>
                     </article>
                 </div>
@@ -188,6 +231,5 @@ onMounted(loadAttractions)
         </main>
 
         <footer>澳門漫遊 · MACAO CULTURAL GUIDE</footer>
-
     </div>
 </template>
