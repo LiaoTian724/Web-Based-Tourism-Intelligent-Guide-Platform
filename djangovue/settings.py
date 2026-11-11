@@ -132,3 +132,15 @@ MAILERS = {
         'BACKEND': 'django.core.mail.backends.console.EmailBackend',
     },
 }
+
+
+
+LOGIN_URL = "/accounts/login/"
+
+LOGIN_REDIRECT_URL = "http://127.0.0.1:5173/"
+
+LOGOUT_REDIRECT_URL = "http://127.0.0.1:5173/"
+
+CSRF_TRUSTED_ORIGINS = [
+    "http://127.0.0.1:5173"
+]
