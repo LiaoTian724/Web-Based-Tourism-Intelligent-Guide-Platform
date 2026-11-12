@@ -18,9 +18,18 @@ const keyword = ref('')
 const area = ref('')
 const label = ref('')
 const foodGroup = ref('')
+
 const sort = ref('distance')
 const referenceId = ref('')
 const selectedItem = ref(null)
+
+// 用户登录状态
+const account = ref({ authenticated: false })
+
+// 收藏操作状态
+const bookmarkLoadingId = ref(null)
+const actionError = ref('')
+
 
 // 获取美食和文创
 async function loadListings() {
@@ -30,9 +39,7 @@ async function loadListings() {
     try {
         const response = await fetch('/api/listings/')
 
-        if (!response.ok) {
-            throw new Error(`HTTP ${response.status}`)
-        }
+        if (!response.ok) {throw new Error(`HTTP ${response.status}`)}
 
         const data = await response.json()
         items.value = data.items || []
@@ -43,6 +50,79 @@ async function loadListings() {
         loading.value = false
     }
 }
+
+
+// 获取用户登录状态
+async function loadAccount() {
+    try {
+        const response = await fetch('/api/account/')
+
+        if (response.ok) {
+            account.value = await response.json()
+        }
+    } catch (err) {
+        console.error(err)
+    }
+}
+
+
+// 获取 CSRF Token
+function getCsrfToken() {
+    const cookie = document.cookie.split('; ').find(item => item.startsWith('csrftoken='))
+    // 原来的字符串：sessionid=abc123; csrftoken=xyz789; theme=dark 变成
+    // [
+    //     'sessionid=abc123',
+    //     'csrftoken=xyz789',
+    //     'theme=dark'
+    // ]
+    return cookie ? cookie.split('=')[1] : ''
+}
+
+
+// 收藏或取消收藏
+async function toggleBookmark(item) {
+
+    // 如果没有登录，跳转到登录页面
+    if (!account.value.authenticated) {
+        window.location.href = `/accounts/login/?next=${encodeURIComponent(window.location.href)}`
+        return
+    }
+
+    bookmarkLoadingId.value = item.id
+    actionError.value = ''
+
+    try {
+        const response = await fetch(
+            `/api/listings/${item.id}/bookmark/`,
+            {
+                method: item.bookmarked ? 'DELETE' : 'POST',
+
+                headers: { 'X-CSRFToken': getCsrfToken() }
+            }
+        )
+
+        if (response.status === 401) {
+            window.location.href = `/accounts/login/?next=${encodeURIComponent(window.location.href)}`
+            return
+        }
+
+        if (!response.ok) { throw new Error(`HTTP ${response.status}`) }
+
+        const data = await response.json()
+
+        // 更新收藏状态
+        items.value = items.value.map(listing =>
+            listing.id === item.id ? { ...listing, bookmarked: data.bookmarked } : listing
+        )
+
+    } catch (err) {
+        actionError.value = err.message || '收藏操作失败'
+    } finally {
+        bookmarkLoadingId.value = null
+    }
+}
+
+
 
 // 根据当前分类筛选
 const currentItems = computed(() => {
@@ -133,7 +213,7 @@ const visibleItems = computed(() => {
 
     if (sort.value === 'distance') {
         results.sort((a, b) => (a.distance ?? Infinity) - (b.distance ?? Infinity))
-    } else {results.sort((a, b) => (b.rating ?? -1) - (a.rating ?? -1) || b.review_count - a.review_count)}
+    } else { results.sort((a, b) => (b.rating ?? -1) - (a.rating ?? -1) || b.review_count - a.review_count) }
 
     return results
 })
@@ -161,7 +241,10 @@ function resetFilters() {
 
 
 // 页面初始化
-onMounted(loadListings)
+onMounted(async () => {
+    await loadAccount()
+    await loadListings()
+})
 </script>
 
 <template>
@@ -174,7 +257,7 @@ onMounted(loadListings)
                 <h2>{{ kind === 'food' ? '澳门地道美食' : '文创与手信' }}</h2>
 
                 <p>
-                    {{ kind === 'food'? '从街坊小吃到葡国料理，探索澳门的味道。' : '发现澳门文化与历史建筑衍生的特色文创。'}}
+                    {{ kind === 'food' ? '从街坊小吃到葡国料理，探索澳门的味道。' : '发现澳门文化与历史建筑衍生的特色文创。' }}
                 </p>
             </div>
 
@@ -220,6 +303,7 @@ onMounted(loadListings)
         <p v-else-if="error" class="discovery-message error">{{ error }}<button @click="loadListings">重试</button></p>
 
         <p v-else class="discovery-count">找到 {{ visibleItems.length }} 项内容</p>
+        <p v-if="actionError" class="discovery-message error"> {{ actionError }} </p>
 
         <!-- 数据卡片 -->
         <div v-if="!loading && !error" class="discovery-grid">
@@ -240,7 +324,7 @@ onMounted(loadListings)
 
                     <div class="discovery-meta">
                         <span>
-                            {{ item.rating != null ? `★ ${Number(item.rating).toFixed(1)}` : '暂无评价'}}
+                            {{ item.rating != null ? `★ ${Number(item.rating).toFixed(1)}` : '暂无评价' }}
                         </span>
 
                         <span v-if="item.distance != null">{{ distanceText(item.distance) }}</span>
@@ -248,7 +332,18 @@ onMounted(loadListings)
                         <span v-if="item.price">{{ item.price }}</span>
                     </div>
 
-                    <button class="discovery-detail-button" @click="selectedItem = item">查看详情</button>
+                    <!-- 收藏按钮 -->
+                    <button
+                        class="bookmark-button"
+                        :class="{ saved: item.bookmarked }"
+                        :disabled="bookmarkLoadingId === item.id"
+                        @click="toggleBookmark(item)"
+                    >
+                        {{ bookmarkLoadingId === item.id ? '处理中...' : item.bookmarked ? '已收藏' : '收藏' }}
+                    </button>
+
+                    <!-- 查看详情 -->
+                    <button class="discovery-detail-button"  @click="selectedItem = item"> 查看详情 </button>
                 </div>
             </article>
 
@@ -268,13 +363,10 @@ onMounted(loadListings)
                     <p class="discovery-label">{{ selectedItem.area_label }}</p>
 
                     <h2>{{ selectedItem.name }}</h2>
-
                     <p>{{ selectedItem.summary }}</p>
 
                     <p v-if="selectedItem.address">地址：{{ selectedItem.address }}</p>
-
                     <p v-if="selectedItem.price">参考价格：{{ selectedItem.price }}</p>
-
                     <div v-if="selectedItem.image_credit" class="discovery-credit">
                         图片来源：
                         <a :href="selectedItem.image_credit.source_url" target="_blank" rel="noopener noreferrer">

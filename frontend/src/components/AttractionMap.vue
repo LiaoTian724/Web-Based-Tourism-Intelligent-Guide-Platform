@@ -42,6 +42,8 @@ function createPopup(place) {
     return box
 }
 
+
+
 // 更新地图标记
 function renderMarkers() {
     if (!markerLayer) return
@@ -54,10 +56,7 @@ function renderMarkers() {
         const lng = place.lng
 
         // 检查经纬度
-        if (
-            !Number.isFinite(lat) || !Number.isFinite(lng) ||
-            Math.abs(lat) > 90 || Math.abs(lng) > 180
-        ) return
+        if (!Number.isFinite(lat) || !Number.isFinite(lng) || Math.abs(lat) > 90 || Math.abs(lng) > 180) return
 
         // 创建编号标记
         const marker = L.marker([lat, lng], {
