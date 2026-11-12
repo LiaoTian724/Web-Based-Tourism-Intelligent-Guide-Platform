@@ -30,6 +30,20 @@ const account = ref({ authenticated: false })
 const bookmarkLoadingId = ref(null)
 const actionError = ref('')
 
+// 评价数据
+const reviews = ref([])
+const myReview = ref(null)
+const reviewLoggedIn = ref(false)
+
+const reviewRating = ref(5)
+const reviewBody = ref('')
+
+const reviewLoading = ref(false)
+const reviewSubmitting = ref(false)
+const reviewError = ref('')
+const reviewMessage = ref('')
+
+
 
 // 获取美食和文创
 async function loadListings() {
@@ -50,6 +64,84 @@ async function loadListings() {
         loading.value = false
     }
 }
+
+
+
+// 加载评价
+async function openDetails(item) {
+
+    selectedItem.value = item
+    reviews.value = []
+    myReview.value = null
+
+    reviewError.value = ''
+    reviewMessage.value = ''
+    reviewLoading.value = true
+
+    try {
+        const response = await fetch(
+            `/api/listings/${item.id}/reviews/`
+        )
+
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}`)
+        }
+
+        const data = await response.json()
+
+        reviews.value = data.items
+        myReview.value = data.my_review
+        reviewLoggedIn.value = data.authenticated
+
+        reviewRating.value = myReview.value?.rating || 5
+        reviewBody.value = myReview.value?.body || ''
+
+    } catch (err) {
+        reviewError.value = err.message
+    } finally {
+        reviewLoading.value = false
+    }
+}
+
+
+
+// 提交评价
+async function submitReview() {
+    if (!selectedItem.value || reviewSubmitting.value) return
+
+    reviewSubmitting.value = true
+    reviewError.value = ''
+    reviewMessage.value = ''
+
+    const form = new FormData()
+
+    form.set('rating', reviewRating.value)
+    form.set('body', reviewBody.value)
+
+    try {
+        const response = await fetch(`/api/listings/${selectedItem.value.id}/reviews/`,
+            {method: 'POST', headers: {'X-CSRFToken': getCsrfToken()}, body: form}
+        )
+
+        const data = await response.json()
+
+        if (!response.ok) {throw new Error(data.error || '提交失败')}
+
+        const item = selectedItem.value
+        await openDetails(item)
+
+        reviewMessage.value = data.message
+
+        await loadListings()
+
+    } catch (err) {
+        reviewError.value = err.message
+    } finally {
+        reviewSubmitting.value = false
+    }
+}
+
+
 
 
 // 获取用户登录状态
@@ -343,7 +435,7 @@ onMounted(async () => {
                     </button>
 
                     <!-- 查看详情 -->
-                    <button class="discovery-detail-button"  @click="selectedItem = item"> 查看详情 </button>
+                    <button class="discovery-detail-button"  @click="openDetails(item)"> 查看详情 </button>
                 </div>
             </article>
 
@@ -380,15 +472,59 @@ onMounted(async () => {
                         </a>
                     </div>
 
-                    <a v-if="selectedItem.source_url" :href="selectedItem.source_url" target="_blank"
-                        rel="noopener noreferrer">
+                    <a v-if="selectedItem.source_url" :href="selectedItem.source_url" target="_blank" rel="noopener noreferrer">
                         查看资料来源 ↗
                     </a>
 
-                    <a v-if="selectedItem.navigation_url" :href="selectedItem.navigation_url" target="_blank"
-                        rel="noopener noreferrer">
+                    <a v-if="selectedItem.navigation_url" :href="selectedItem.navigation_url" target="_blank" rel="noopener noreferrer">
                         Google Maps 导航 ↗
                     </a>
+
+
+                    <!-- 评价区域 -->
+                    <section class="review-section">
+                        <h3>用户评价</h3>
+
+                        <p v-if="reviewLoading">正在加载评价...</p>
+                        <p v-if="reviewError">{{ reviewError }}</p>
+                        <p v-if="reviewMessage">{{ reviewMessage }}</p>
+
+                        <form v-if="reviewLoggedIn" @submit.prevent="submitReview">
+                            <p v-if="myReview">我的评价： {{ myReview.status === 'pending' ? '待审核' : myReview.status === 'approved' ? '已通过' : '已拒绝'}}</p>
+
+                            <label>评分
+                                <select v-model.number="reviewRating">
+                                    <option :value="1">1 星</option>
+                                    <option :value="2">2 星</option>
+                                    <option :value="3">3 星</option>
+                                    <option :value="4">4 星</option>
+                                    <option :value="5">5 星</option>
+                                </select>
+                            </label>
+
+                            <label> 评价内容
+                                <textarea v-model="reviewBody" maxlength="500" required placeholder="分享你的体验..."></textarea>
+                            </label>
+
+                            <button type="submit" :disabled="reviewSubmitting">{{ reviewSubmitting ? '提交中...' : '提交评价' }}</button>
+                        </form>
+
+                        <p v-else><a href="/accounts/login/?next=/">登录后发表评价</a></p>
+
+                        <h3>其他游客的评价</h3>
+
+                        <div v-for="review in reviews" :key="review.id" class="review-item">
+                            <strong>{{ review.author }}</strong>
+                            <span>★ {{ review.rating }}/5</span>
+                            <p>{{ review.body }}</p>
+                        </div>
+
+                        <p v-if="!reviewLoading && !reviews.length">暂无公开评价</p>
+                    </section>
+
+
+
+
 
                 </div>
             </div>

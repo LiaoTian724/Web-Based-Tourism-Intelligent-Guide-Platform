@@ -1014,3 +1014,46 @@ footer {
     opacity: 0.6;
     cursor: not-allowed;
 }
+
+
+
+
+/* 用户评价 */
+.review-section {
+    margin-top: 25px;
+    padding-top: 20px;
+    border-top: 1px solid #e9e6df;
+}
+
+.review-section h3 {
+    margin: 20px 0 12px;
+}
+
+.review-section form {
+    display: grid;
+    gap: 12px;
+}
+
+.review-section label {
+    display: grid;
+    gap: 8px;
+}
+
+.review-section textarea {
+    width: 100%;
+    min-height: 100px;
+    padding: 12px;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    font: inherit;
+}
+
+.review-item {
+    padding: 14px 0;
+    border-bottom: 1px solid #e9e6df;
+}
+
+.review-item span {
+    margin-left: 12px;
+    color: #a07c48;
+}

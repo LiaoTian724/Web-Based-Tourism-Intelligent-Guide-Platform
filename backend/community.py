@@ -3,8 +3,10 @@ from urllib.parse import urlencode
 from django.db.models import Avg, Count, Q
 from django.http import JsonResponse
 
+from django.views.decorators.csrf import ensure_csrf_cookie
 from django.views.decorators.http import require_GET, require_http_methods
-from .models import Bookmark, ListingKind, LocalListing, ReviewStatus
+
+from .models import Bookmark, ListingKind, LocalListing, Review, ReviewStatus
 
 from django.contrib.staticfiles.storage import staticfiles_storage
 from .discovery_photos import PHOTO_CREDITS, SVG_IMAGE_KEYS
@@ -138,3 +140,57 @@ def my_bookmarks(request):
 
     data = [listing_to_dict(item, bookmarked_ids) for item in items]
     return JsonResponse({"count": len(data), "items": data})
+
+
+
+
+
+# 查看和提交美食、文创评价
+@ensure_csrf_cookie
+@require_http_methods(["GET", "POST"])
+def listing_reviews(request, listing_id):
+    listing = LocalListing.objects.filter(id=listing_id, enabled=True).first()
+
+    if not listing:
+        return JsonResponse({"error": "内容不存在"}, status=404)
+
+    # 获取公开评价
+    if request.method == "GET":
+        reviews = Review.objects.filter(listing=listing, status=ReviewStatus.APPROVED).select_related("user")
+
+        data = [
+            {
+                "id": review.id, "rating": review.rating, "body": review.body, "author": review.user.first_name.strip() or review.user.username
+            } for review in reviews
+        ]
+
+        my_review = None
+
+        if request.user.is_authenticated:
+            review = Review.objects.filter(user=request.user, listing=listing).first()
+
+            if review:
+                my_review = {"rating": review.rating, "body": review.body, "status": review.status}
+
+        return JsonResponse({"items": data, "my_review": my_review, "authenticated": request.user.is_authenticated})
+
+    # 必须登录才能评价
+    if not request.user.is_authenticated:
+        return JsonResponse({"error": "请先登录"}, status=401)
+
+    rating = request.POST.get("rating", "")
+    body = request.POST.get("body", "").strip()
+
+    if rating not in ["1", "2", "3", "4", "5"]:
+        return JsonResponse({"error": "评分必须是1到5星"}, status=400)
+
+    if not body or len(body) > 500:
+        return JsonResponse({"error": "评价必须为1到500字"}, status=400)
+
+    # 创建或更新评价
+    Review.objects.update_or_create(
+        user=request.user, listing=listing,
+        defaults={"rating": int(rating), "body": body, "status": ReviewStatus.PENDING, "ai_advice": "", "ai_advised_at": None}
+    )
+
+    return JsonResponse({ "message": "评价提交成功，等待管理员审核"})
