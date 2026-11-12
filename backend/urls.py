@@ -23,4 +23,8 @@ urlpatterns = [
         name="logout",
     ),
     path("api/account/", accounts.current_account, name="account"),
+
+
+    path("api/itineraries/plan/", views.plan, name="plan",),
+
 ]

@@ -54,7 +54,6 @@ class RegistrationForm(UserCreationForm):
 
 
 class LoginForm(AuthenticationForm):
-
     username = forms.CharField(label="邮箱或管理员账号", max_length=150)
 
     def clean_username(self):
@@ -75,3 +74,17 @@ class LoginForm(AuthenticationForm):
 
         # 如果不是邮箱，直接使用用户名登录
         return username
+
+
+
+
+
+
+class PlanForm(forms.Form):
+    interests = forms.MultipleChoiceField(
+        choices=Category.choices, required=False,
+    )
+
+    budget_minutes = forms.IntegerField(
+        min_value=30, max_value=480,
+    )

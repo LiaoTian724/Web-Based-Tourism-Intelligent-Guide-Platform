@@ -3,6 +3,7 @@ import { ref, onMounted, computed } from 'vue'
 import AttractionMap from './components/AttractionMap.vue'
 import LocalListings from './components/LocalListings.vue'
 import MyBookmarks from './components/MyBookmarks.vue'
+import ItineraryPlanner from './components/ItineraryPlanner.vue'
 
 // 景点数据
 const attractions = ref([])
@@ -147,6 +148,7 @@ onMounted(() => {
                 <button :class="{ active: activePage === 'attractions' }" @click="activePage = 'attractions'">景点探索</button>
                 <button :class="{ active: activePage === 'discovery' }" @click="activePage = 'discovery'">美食与文创</button>
                 <button :class="{ active: activePage === 'bookmarks' }" @click="activePage = 'bookmarks'">我的收藏</button>
+                <button :class="{ active: activePage === 'planner' }" @click="activePage = 'planner'">行程规划</button>
             </nav>
 
             <!-- 用户登录状态 -->
@@ -180,10 +182,12 @@ onMounted(() => {
 
                 <h1 v-if="activePage === 'attractions'">在澳门，发现城市的另一面。</h1>
                 <h1 v-else-if="activePage === 'discovery'"> 从街头味道到澳门手信。 </h1>
+                <h1 v-else-if="activePage === 'planner'"> 规划属于你的澳门漫步。 </h1>
                 <h1 v-else>收藏你的澳门记忆。</h1>
 
                 <p v-if="activePage === 'attractions'">从世界文化遗产到城市街巷，探索澳门独特的历史、文化与生活。</p>
                 <p v-else-if="activePage === 'discovery'">从街头美食到特色手信，发现澳门独特的本地生活与城市风味。</p>
+                <p v-else-if="activePage === 'planner'">根据你的兴趣与时间预算，生成个性化的澳门步行行程。</p>
                 <p v-else>查看和管理你收藏的景点、美食与澳门手信。</p>
             </section>
 
@@ -299,6 +303,7 @@ onMounted(() => {
             </template>
 
             <LocalListings v-else-if="activePage === 'discovery'" :attractions="attractions"/>
+            <ItineraryPlanner v-else-if="activePage === 'planner'" :categories="categories"/>
             <MyBookmarks v-else />
         </main>
 
