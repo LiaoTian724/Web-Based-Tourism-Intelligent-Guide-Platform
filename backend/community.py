@@ -1,36 +1,27 @@
-"""Read-only API for Macau food and cultural-product listings."""
-
 from urllib.parse import urlencode
 
 from django.db.models import Avg, Count, Q
 from django.http import JsonResponse
-from django.views.decorators.http import require_GET
 
-from .models import ListingKind, LocalListing, ReviewStatus
+from django.views.decorators.http import require_GET, require_http_methods
+from .models import Bookmark, ListingKind, LocalListing, ReviewStatus
 
 from django.contrib.staticfiles.storage import staticfiles_storage
 from .discovery_photos import PHOTO_CREDITS, SVG_IMAGE_KEYS
 
 
 def listing_to_dict(item, bookmarked_ids):
-    """Convert one LocalListing record into the frontend JSON format."""
+    #  onvert one LocalListing record into the frontend JSON format.
     # 生成图片 URL
     image_url = ""
 
     if item.image_key:
-        extension = (
-            "svg"
-            if item.image_key in SVG_IMAGE_KEYS
-            else "webp"
-        )
+        extension = "svg" if item.image_key in SVG_IMAGE_KEYS else "webp"
 
-        image_url = staticfiles_storage.url(
-            f"discovery/{item.image_key}.{extension}"
-        )
+        image_url = staticfiles_storage.url(f"discovery/{item.image_key}.{extension}")
 
     # 获取图片版权信息
     image_credit = PHOTO_CREDITS.get(item.image_key)
-
 
     destination = item.address or item.name
 
@@ -39,14 +30,13 @@ def listing_to_dict(item, bookmarked_ids):
 
     navigation_url = ""
     if item.kind == ListingKind.FOOD:
-        navigation_url = "https://www.google.com/maps/dir/?" + urlencode({
-            "api": "1",
-            "destination": destination,
-            "travelmode": "walking",
-        })
-
-    image_credit = PHOTO_CREDITS.get(item.image_key)
-    extension = "webp" if image_credit else "svg"
+        navigation_url = "https://www.google.com/maps/dir/?" + urlencode(
+            {
+                "api": "1",
+                "destination": destination,
+                "travelmode": "walking",
+            }
+        )
 
     return {
         "id": item.pk,
@@ -75,29 +65,76 @@ def listing_to_dict(item, bookmarked_ids):
 
 @require_GET
 def listings(request):
-    """Return all enabled food and cultural-product records."""
+    # Return all enabled food and cultural-product records.
     approved_reviews = Q(reviews__status=ReviewStatus.APPROVED)
 
-    items = (
-        LocalListing.objects
-        .filter(enabled=True)
+    items = (LocalListing.objects.filter(enabled=True)
         .annotate(
             rating=Avg("reviews__rating", filter=approved_reviews),
             review_count=Count("reviews", filter=approved_reviews),
-        )
-        .order_by("id")
-    )
+        ).order_by("id"))
 
     if request.user.is_authenticated:
-        bookmarked_ids = set(
-            request.user.listing_bookmarks.values_list("listing_id", flat=True)
-        )
+        bookmarked_ids = set(request.user.listing_bookmarks.values_list("listing_id", flat=True))
     else:
         bookmarked_ids = set()
 
     data = [listing_to_dict(item, bookmarked_ids) for item in items]
 
-    return JsonResponse({
-        "count": len(data),
-        "items": data,
-    })
+    return JsonResponse(
+        {
+            "count": len(data),
+            "items": data,
+        }
+    )
+
+
+# 收藏和取消收藏
+@require_http_methods(["POST", "DELETE"])
+def listing_bookmark(request, listing_id):
+    # 必须登录才能收藏
+    if not request.user.is_authenticated:
+        return JsonResponse({"error": "请先登录"}, status=401)
+
+    # 查找景点或文创
+    listing = LocalListing.objects.filter(id=listing_id, enabled=True).first()
+
+    if not listing:
+        return JsonResponse({"error": "内容不存在"}, status=404)
+
+    # 收藏
+    if request.method == "POST":
+        Bookmark.objects.get_or_create(user=request.user, listing=listing)
+        bookmarked = True
+
+    # 取消收藏
+    else:
+        Bookmark.objects.filter(user=request.user, listing=listing).delete()
+        bookmarked = False
+
+    return JsonResponse({"bookmarked": bookmarked})
+
+
+# 获取当前用户的收藏
+@require_GET
+def my_bookmarks(request):
+    # 检查登录
+    if not request.user.is_authenticated:
+        return JsonResponse({"error": "请先登录"}, status=401)
+
+    # 查找用户收藏的内容
+    bookmark_ids = Bookmark.objects.filter(user=request.user, listing__enabled=True).values_list("listing_id", flat=True)
+    bookmarked_ids = set(bookmark_ids)
+
+    # 获取收藏内容及其公开评分
+    approved_reviews = Q(reviews__status=ReviewStatus.APPROVED)
+
+    items = (LocalListing.objects.filter(id__in=bookmarked_ids, enabled=True)
+        .annotate(
+            rating=Avg("reviews__rating", filter=approved_reviews),
+            review_count=Count("reviews", filter=approved_reviews),
+        ).order_by("id")
+    )
+
+    data = [listing_to_dict(item, bookmarked_ids) for item in items]
+    return JsonResponse({"count": len(data), "items": data})

@@ -314,7 +314,9 @@ body {
     margin: 0;
 }
 
-button, input, select {
+button,
+input,
+select {
     font: inherit;
 }
 
@@ -382,7 +384,7 @@ button, input, select {
     margin: 14px 0;
 }
 
-.hero > p:last-child {
+.hero>p:last-child {
     color: #778078;
     line-height: 1.8;
 }
@@ -409,7 +411,8 @@ button, input, select {
     color: #68756d;
 }
 
-input, select {
+input,
+select {
     height: 44px;
     padding: 0 12px;
     border: 1px solid #dce0da;
@@ -418,7 +421,8 @@ input, select {
     min-width: 0;
 }
 
-input:focus, select:focus {
+input:focus,
+select:focus {
     outline: 2px solid #b8d0bd;
 }
 
@@ -469,7 +473,7 @@ button:disabled {
     font-size: 26px;
 }
 
-.section-title > span {
+.section-title>span {
     color: #78847c;
     font-size: 13px;
 }
@@ -691,6 +695,39 @@ footer {
     color: #203e35;
 }
 
+
+/* 用户登录区域 */
+.header-account {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-size: 13px;
+}
+
+.header-account a {
+    color: white;
+    text-decoration: none;
+}
+
+.header-account form {
+    margin: 0;
+}
+
+.header-account button {
+    height: 34px;
+    padding: 0 12px;
+    background: #d8b77d;
+    color: #203e35;
+}
+
+@media (max-width: 700px) {
+    .header {
+        flex-wrap: wrap;
+        gap: 12px;
+    }
+}
+
+
 .discovery-page {
     padding: 45px 0;
     text-align: left;
@@ -715,7 +752,7 @@ footer {
     margin: 10px 0;
 }
 
-.discovery-heading > div > p:last-child {
+.discovery-heading>div>p:last-child {
     color: #78847c;
     line-height: 1.7;
 }
@@ -846,6 +883,22 @@ footer {
     width: 100%;
 }
 
+/* 收藏按钮 */
+.bookmark-button {
+    width: 100%;
+    margin-bottom: 8px;
+    background: #edf0eb;
+    color: #40584b;
+}
+
+/* 已收藏状态 */
+.bookmark-button.saved {
+    background: #d8b77d;
+    color: #203e35;
+}
+
+
+
 .discovery-message {
     padding: 40px;
     text-align: center;
@@ -877,7 +930,7 @@ footer {
     border-radius: 16px;
 }
 
-.discovery-modal-content > img {
+.discovery-modal-content>img {
     width: 100%;
     max-height: 300px;
     object-fit: cover;
@@ -892,7 +945,7 @@ footer {
     margin: 10px 0;
 }
 
-.discovery-modal-body > a {
+.discovery-modal-body>a {
     display: inline-block;
     margin: 12px 12px 0 0;
     color: #315d4b;
@@ -941,4 +994,23 @@ footer {
         padding: 0 8px;
         font-size: 12px;
     }
+}
+
+
+
+/* 我的收藏：取消收藏按钮 */
+.bookmark-remove-button {
+    width: 100%;
+    margin-top: 12px;
+    padding: 10px;
+    background: #edf0eb;
+    color: #40584b;
+    border-radius: 8px;
+}
+
+.bookmark-remove-button:hover {background: #d8b77d;}
+
+.bookmark-remove-button:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
 }
