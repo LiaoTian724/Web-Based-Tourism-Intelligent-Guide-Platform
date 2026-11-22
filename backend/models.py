@@ -36,39 +36,22 @@ class Profile(models.Model):
 class Attraction(models.Model):
     slug = models.SlugField(unique=True)
     name = models.CharField("景点名称", max_length=120)
-
     name_en = models.CharField("英文名称", max_length=160, blank=True)
-
     category = models.CharField("分类", max_length=16, choices=Category)
-
     sight_type = models.CharField("观光分类", max_length=12, choices=SightType, blank=True, default="")
-
     world_heritage = models.BooleanField("澳门世界遗产", default=False)
-
     region = models.CharField("区域", max_length=12, choices=Region, default=Region.PENINSULA)
-
     less_known = models.BooleanField("小众地点", default=False)
-
     summary = models.CharField("简介", max_length=240)
-
     history = models.TextField("历史与文化")
-
     address = models.CharField("地址", max_length=200)
-
     hours = models.CharField("开放信息", max_length=200)
-
     admission = models.CharField("门票", max_length=100)
-
     visit_minutes = models.PositiveSmallIntegerField("建议停留分钟", default=30)
-
     latitude = models.DecimalField("纬度", max_digits=8, decimal_places=6)
-
     longitude = models.DecimalField("经度", max_digits=9, decimal_places=6)
-
     source_url = models.URLField("资料来源", blank=True)
-
     artwork = models.CharField("插画样式", max_length=24, blank=True)
-
     enabled = models.BooleanField("公开显示", default=True)
 
 
@@ -190,8 +173,7 @@ class Review(models.Model):
         ordering = ["-updated_at", "-id"]
         constraints = [
             models.CheckConstraint(condition=(
-                models.Q(attraction__isnull=False, listing__isnull=True)
-                | models.Q(attraction__isnull=True, listing__isnull=False)
+                models.Q(attraction__isnull=False, listing__isnull=True) | models.Q(attraction__isnull=True, listing__isnull=False)
             ), name="one_review_target"),
             models.CheckConstraint(condition=models.Q(rating__gte=1, rating__lte=5), name="rating_between_one_and_five"),
             models.UniqueConstraint(fields=["user", "attraction"], condition=models.Q(attraction__isnull=False), name="one_review_per_attraction"),

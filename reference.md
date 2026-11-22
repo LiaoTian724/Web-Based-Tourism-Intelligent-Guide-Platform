@@ -10,8 +10,13 @@ cd /Volumes/E_disk/Project/MACAU_TOURISM_DESIGN/frontend
 npm run dev
 
 
+http://127.0.0.1:5173/
 
 
+
+
+
+## ==============================================
 
 
 

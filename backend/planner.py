@@ -21,9 +21,9 @@ def walk_minutes(origin, destination):
     return max(1, round(distance_km * 1.3 / 4 * 60))
 
 
+
 def build_plan(attractions, interests, budget_minutes):
     # Build an itinerary with at most four attractions.
-
     remaining = list(attractions)
     stops = []
     used_minutes = 0
@@ -44,13 +44,7 @@ def build_plan(attractions, interests, budget_minutes):
 
         _, cost, _, walk, chosen = min(candidates)
 
-        stops.append(
-            {
-                "attraction": chosen,
-                "walk_minutes": walk,
-                "visit_minutes": chosen.visit_minutes,
-            }
-        )
+        stops.append({"attraction": chosen,  "walk_minutes": walk,  "visit_minutes": chosen.visit_minutes,})
 
         used_minutes += cost
         remaining.remove(chosen)

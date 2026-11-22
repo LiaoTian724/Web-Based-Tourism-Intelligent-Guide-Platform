@@ -13,29 +13,29 @@ const removingId = ref(null)
 // 获取 CSRF Token
 function getCsrfToken() {
     const cookie = document.cookie.split('; ').find(item => item.startsWith('csrftoken='))
-
     return cookie ? decodeURIComponent(cookie.split('=')[1]) : ''
 }
 
-// 获取收藏列表
+
+// 获取收藏列表  GET
 async function loadBookmarks() {
     loading.value = true
     error.value = ''
     needLogin.value = false
 
     try {
-        const response = await fetch('/api/bookmarks/')
+        const response = await fetch('/api/bookmarks/', {
+            method: 'GET'
+        })
 
         if (response.status === 401) {
             needLogin.value = true
             return
         }
-
         if (!response.ok) {throw new Error(`HTTP ${response.status}`)}
 
         const data = await response.json()
         items.value = data.items || []
-
     } catch (err) {
         error.value = err.message || '获取收藏失败'
     } finally {
@@ -43,7 +43,8 @@ async function loadBookmarks() {
     }
 }
 
-// 取消收藏
+
+// 取消收藏 DELETE
 async function removeBookmark(item) {
     removingId.value = item.id
     error.value = ''
@@ -68,12 +69,12 @@ async function removeBookmark(item) {
 }
 
 
-
 // 页面初始化
 onMounted(loadBookmarks)
-
-
 </script>
+
+
+
 <template>
     <section class="discovery-page">
         <div class="discovery-heading">

@@ -4,23 +4,15 @@ import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 
 const props = defineProps({
-    places: {
-        type: Array,
-        default: () => []
-    },
-    selectedId: {
-        type: Number,
-        default: null
-    }
+    places: {type: Array,  default: () => []},
+    selectedId: {type: Number, default: null}
 })
 
 const emit = defineEmits(['select'])
-
 const mapElement = ref(null)
 
 let map = null
 let markerLayer = null
-
 const markers = new Map()
 
 // 创建景点弹窗
@@ -38,7 +30,6 @@ function createPopup(place) {
     address.textContent = place.address
 
     box.append(name, address)
-
     return box
 }
 
@@ -98,9 +89,7 @@ function focusSelected() {
 
     const marker = markers.get(props.selectedId)
     if (!marker) return
-
     map.setView(marker.getLatLng(), Math.max(map.getZoom(), 15))
-
     marker.openPopup()
 }
 
@@ -124,6 +113,7 @@ onMounted(() => {
     focusSelected()
 })
 
+
 // 景点数据发生变化时更新标记
 watch(
     () => props.places,
@@ -146,17 +136,17 @@ onUnmounted(() => {
 })
 </script>
 
+
 <template>
     <section class="map-card">
-
         <div ref="mapElement" class="map-canvas"></div>
 
-        <p class="map-help">
-            点击地图标记查看景点，也可以从景点卡片定位。
-        </p>
+        <p class="map-help">点击地图标记查看景点，也可以从景点卡片定位。</p>
 
     </section>
 </template>
+
+
 
 <style scoped>
 .map-card {

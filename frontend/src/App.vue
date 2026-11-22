@@ -14,9 +14,6 @@ const account = ref(null)
 const csrfToken = ref('')
 const accountError = ref(false)
 
-
-
-
 // 搜索条件
 const keyword = ref('')
 const region = ref('')
@@ -80,7 +77,6 @@ async function loadAttractions() {
         if (!response.ok) { throw new Error(`HTTP ${response.status}`) }
 
         const data = await response.json()
-
         attractions.value = data.items || []
 
         // 如果筛选后景点不存在，清除原来的选择
@@ -107,19 +103,21 @@ function resetFilters() {
 // 获取当前登录用户
 async function loadAccount() {
     try {
-        const response = await fetch('/api/account/')
+        const response = await fetch('/api/account/', {
+            method: 'GET'
+        })
 
         if (!response.ok) {throw new Error('获取用户信息失败')}
         account.value = await response.json()
-
         const cookie = document.cookie.split('; ').find(item => item.startsWith('csrftoken='))
-
         csrfToken.value = cookie ? decodeURIComponent(cookie.split('=')[1]) : ''
     } catch (err) {
         accountError.value = true
         console.error(err)
     }
 }
+
+
 
 // 页面加载后获取数据
 onMounted(() => {

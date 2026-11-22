@@ -1,11 +1,7 @@
 <script setup>
 import { computed, onMounted, ref, watch } from 'vue'
 
-const props = defineProps({
-    attractions: {
-        type: Array, default: () => []
-    }
-})
+const props = defineProps({attractions: {type: Array, default: () => []}})
 
 // 页面数据
 const items = ref([])
@@ -18,7 +14,6 @@ const keyword = ref('')
 const area = ref('')
 const label = ref('')
 const foodGroup = ref('')
-
 const sort = ref('distance')
 const referenceId = ref('')
 const selectedItem = ref(null)
@@ -34,10 +29,8 @@ const actionError = ref('')
 const reviews = ref([])
 const myReview = ref(null)
 const reviewLoggedIn = ref(false)
-
 const reviewRating = ref(5)
 const reviewBody = ref('')
-
 const reviewLoading = ref(false)
 const reviewSubmitting = ref(false)
 const reviewError = ref('')
@@ -45,19 +38,19 @@ const reviewMessage = ref('')
 
 
 
-// 获取美食和文创
+// 获取美食和文创  GET
 async function loadListings() {
     loading.value = true
     error.value = ''
 
     try {
-        const response = await fetch('/api/listings/')
+        const response = await fetch('/api/listings/', {
+            meothod: 'GET'
+        })
 
         if (!response.ok) {throw new Error(`HTTP ${response.status}`)}
-
         const data = await response.json()
         items.value = data.items || []
-
     } catch (err) {
         error.value = err.message || '获取数据失败'
     } finally {
@@ -67,26 +60,21 @@ async function loadListings() {
 
 
 
-// 加载评价
+// 加载评价  GET
 async function openDetails(item) {
-
     selectedItem.value = item
     reviews.value = []
     myReview.value = null
-
     reviewError.value = ''
     reviewMessage.value = ''
     reviewLoading.value = true
 
     try {
-        const response = await fetch(
-            `/api/listings/${item.id}/reviews/`
-        )
+        const response = await fetch(`/api/listings/${item.id}/reviews/`, {
+            method: 'GET'
+        }) 
 
-        if (!response.ok) {
-            throw new Error(`HTTP ${response.status}`)
-        }
-
+        if (!response.ok) {throw new Error(`HTTP ${response.status}`)}
         const data = await response.json()
 
         reviews.value = data.items
@@ -95,7 +83,6 @@ async function openDetails(item) {
 
         reviewRating.value = myReview.value?.rating || 5
         reviewBody.value = myReview.value?.body || ''
-
     } catch (err) {
         reviewError.value = err.message
     } finally {
@@ -105,7 +92,7 @@ async function openDetails(item) {
 
 
 
-// 提交评价
+// 提交评价  POST
 async function submitReview() {
     if (!selectedItem.value || reviewSubmitting.value) return
 
@@ -119,21 +106,18 @@ async function submitReview() {
     form.set('body', reviewBody.value)
 
     try {
-        const response = await fetch(`/api/listings/${selectedItem.value.id}/reviews/`,
-            {method: 'POST', headers: {'X-CSRFToken': getCsrfToken()}, body: form}
-        )
+        const response = await fetch(`/api/listings/${selectedItem.value.id}/reviews/`, {
+            method: 'POST', 
+            headers: {'X-CSRFToken': getCsrfToken()}, body: form
+        })
 
         const data = await response.json()
-
         if (!response.ok) {throw new Error(data.error || '提交失败')}
 
         const item = selectedItem.value
         await openDetails(item)
-
         reviewMessage.value = data.message
-
         await loadListings()
-
     } catch (err) {
         reviewError.value = err.message
     } finally {
@@ -144,14 +128,13 @@ async function submitReview() {
 
 
 
-// 获取用户登录状态
+// 获取用户登录状态  GET
 async function loadAccount() {
     try {
-        const response = await fetch('/api/account/')
-
-        if (response.ok) {
-            account.value = await response.json()
-        }
+        const response = await fetch('/api/account/', {
+            method: "GET"
+        })
+        if (response.ok) {account.value = await response.json()}
     } catch (err) {
         console.error(err)
     }
@@ -173,7 +156,6 @@ function getCsrfToken() {
 
 // 收藏或取消收藏
 async function toggleBookmark(item) {
-
     // 如果没有登录，跳转到登录页面
     if (!account.value.authenticated) {
         window.location.href = `/accounts/login/?next=${encodeURIComponent(window.location.href)}`
@@ -188,7 +170,6 @@ async function toggleBookmark(item) {
             `/api/listings/${item.id}/bookmark/`,
             {
                 method: item.bookmarked ? 'DELETE' : 'POST',
-
                 headers: { 'X-CSRFToken': getCsrfToken() }
             }
         )
@@ -199,7 +180,6 @@ async function toggleBookmark(item) {
         }
 
         if (!response.ok) { throw new Error(`HTTP ${response.status}`) }
-
         const data = await response.json()
 
         // 更新收藏状态
@@ -222,16 +202,10 @@ const currentItems = computed(() => {
 })
 
 // 区域选项
-const areas = computed(() => {
-    return [...new Map(
-        currentItems.value.map(item => [item.area, item.area_label])
-    )]
-})
+const areas = computed(() => {return [...new Map(currentItems.value.map(item => [item.area, item.area_label]))]})
 
 // 菜品与店型选项
-const labels = computed(() => {
-    return [...new Set(currentItems.value.map(item => item.label).filter(Boolean))]
-})
+const labels = computed(() => {return [...new Set(currentItems.value.map(item => item.label).filter(Boolean))]})
 
 // 美食主题
 const foodGroups = computed(() => {
