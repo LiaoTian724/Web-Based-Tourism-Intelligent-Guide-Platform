@@ -301,7 +301,7 @@ onMounted(() => {
             </template>
 
             <LocalListings v-else-if="activePage === 'discovery'" :attractions="attractions" :account="account"/>
-            <ItineraryPlanner v-else-if="activePage === 'planner'" :categories="categories"/>
+            <ItineraryPlanner v-else-if="activePage === 'planner'" :categories="categories" :account="account"/>
             <MyBookmarks v-else />
         </main>
 

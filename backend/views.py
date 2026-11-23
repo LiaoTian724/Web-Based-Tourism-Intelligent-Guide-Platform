@@ -123,12 +123,23 @@ def plan(request):
         if save and [stop["attraction"].pk for stop in stops] != data.get("stop_ids"):
             return JsonResponse({"error": "景点数据已更新，请重新生成后再保存"}, status=409,)
 
+
         # 创建行程及其景点记录
         if save and stops:
-            itinerary = Itinerary.objects.create(user=request.user,  budget_minutes=budget,)
+            stop_ids = [stop["attraction"].pk for stop in stops]
 
+            # 查找当前用户是否已经保存相同的行程
+            existing_trips = request.user.itineraries.filter(budget_minutes=budget).prefetch_related("stops__attraction")
+
+            for existing in existing_trips:
+                existing_ids = [stop.attraction_id for stop in existing.stops.all()]
+                if existing_ids == stop_ids:
+                    return JsonResponse(saved_plan(existing))
+
+            # 不存在重复行程，才创建新记录
+            itinerary = Itinerary.objects.create(user=request.user,  budget_minutes=budget)
             ItineraryStop.objects.bulk_create([
-                ItineraryStop(itinerary=itinerary, position=index,  **stop,)
+                ItineraryStop(itinerary=itinerary, position=index, **stop)
                 for index, stop in enumerate(stops, start=1)
             ])
 

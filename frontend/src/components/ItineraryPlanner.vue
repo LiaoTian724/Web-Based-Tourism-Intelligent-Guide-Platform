@@ -1,71 +1,3 @@
-<!-- <script setup>
-import { computed, ref } from 'vue'
-
-const props = defineProps({
-    categories: {type: Array, required: true}
-})
-
-
-const interestOptions = computed(() => props.categories.filter(item => item.value))
-
-// 用户输入
-const interests = ref([])
-const budgetMinutes = ref(180)
-
-// 页面状态
-const loading = ref(false)
-const error = ref('')
-const trip = ref(null)
-
-// 获取 Django CSRF Token
-function getCsrfToken() {
-    const cookie = document.cookie.split('; ').find(item => item.startsWith('csrftoken='))
-    return cookie ? decodeURIComponent(cookie.split('=')[1]) : ''
-}
-
-
-
-// 生成规则行程   POST
-async function generatePlan() {
-    if (loading.value) return
-    loading.value = true
-    error.value = ''
-    trip.value = null
-
-    try {
-        let csrfToken = getCsrfToken()
-
-        // 若尚未取得 CSRF Cookie，先请求已有的账户接口
-        if (!csrfToken) {
-            const accountResponse = await fetch('/api/account/', {
-                method: "GET"
-            }) 
-            if (!accountResponse.ok) {throw new Error('无法初始化请求，请刷新页面')}
-            csrfToken = getCsrfToken()
-        }
-
-        if (!csrfToken) {throw new Error('无法获取 CSRF Token')}
-
-        const response = await fetch('/api/itineraries/plan/', {
-            method: 'POST',  credentials: 'same-origin',
-            headers: {'Content-Type': 'application/json',  'X-CSRFToken': csrfToken},
-            body: JSON.stringify({interests: interests.value, budget_minutes: Number(budgetMinutes.value)})
-        })
-
-        const data = await response.json().catch(() => null)
-        if (!response.ok) {throw new Error(data?.error || `HTTP ${response.status}`)}
-        if (!Array.isArray(data?.stops)) {throw new Error('服务器返回的行程格式不正确')}
-        trip.value = data
-    } catch (err) {
-        error.value = err.message || '生成行程失败'
-    } finally {
-        loading.value = false
-    }
-}
-</script> -->
-
-
-
 
 <script setup>
 import { computed, ref, watch } from 'vue'
@@ -218,7 +150,7 @@ async function generatePlan(save = false) {
             <!-- 右侧：结果 -->
             <div class="plan-panel">
                 <h2>行程建议</h2>
-
+                <p v-if="message" role="status">{{ message }}</p>
                 <p v-if="error" class="plan-error" role="alert">{{ error }}</p>
 
                 <template v-else-if="trip">
@@ -239,6 +171,25 @@ async function generatePlan(save = false) {
                         <a v-if="trip.navigation_url" class="plan-navigation" :href="trip.navigation_url" target="_blank" rel="noopener noreferrer">
                             在 Google Maps 中查看路线
                         </a>
+
+                        <div v-if="trip?.stops?.length" class="plan-actions">
+                            <!-- 未登录 -->
+                            <a v-if="props.account && !props.account.authenticated" href="/accounts/login/?next=/">
+                                登录后保存行程
+                            </a>
+
+                            <!-- 已登录，尚未保存 -->
+                            <button v-else-if="props.account?.authenticated && !trip.id"
+                                type="button" :disabled="loading"  @click="generatePlan(true)"
+                            >
+                                {{ loading ? '正在保存...' : '保存行程' }}
+                            </button>
+
+                            <!-- 已登录，已经保存 -->
+                            <a v-else-if="props.account?.authenticated && trip.id" :href="`/api/itineraries/${trip.id}/export/`">
+                                下载 Markdown
+                            </a>
+                        </div>
                     </template>
 
                     <p v-else> 当前时间预算无法安排景点，请增加可用时间。</p>
@@ -248,6 +199,28 @@ async function generatePlan(save = false) {
             </div>
 
         </div>
+
+        <section v-if="props.account?.authenticated" class="plan-panel saved-panel">
+            <h2>我的行程</h2>
+            <p v-if="savedError" class="plan-error">
+                {{ savedError }}
+                <button @click="loadSavedTrips">重试</button>
+            </p>
+
+            <p v-else-if="!savedTrips.length">还没有保存的行程。</p>
+            <ul v-else class="saved-list">
+                <li v-for="item in savedTrips" :key="item.id">
+                    <div>
+                        <strong>
+                            {{item.stops.map(stop => stop.name + (stop.enabled ? '' : '（已下架）')).join(' → ')}}
+                        </strong>
+                        <p>{{ item.total_minutes }} 分钟</p>
+                    </div>
+
+                    <a :href="`/api/itineraries/${item.id}/export/`">导出</a>
+                </li>
+            </ul>
+        </section>
     </section>
 </template>
 
@@ -361,4 +334,57 @@ async function generatePlan(save = false) {
         grid-template-columns: 1fr;
     }
 }
+
+
+.plan-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin-top: 18px;
+}
+
+.plan-actions button {
+    flex: 1;
+}
+
+.plan-actions a {
+    flex: 1;
+    padding: 12px;
+    text-align: center;
+    border-radius: 8px;
+    background: #edf3ed;
+    color: #315d4b;
+    text-decoration: none;
+}
+
+.saved-panel {
+    margin-top: 22px;
+}
+
+.saved-list {
+    list-style: none;
+    padding: 0;
+}
+
+.saved-list li {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 16px 0;
+    border-bottom: 1px solid #e9e6df;
+}
+
+.saved-list li p {
+    margin-top: 8px;
+    color: #78847c;
+    font-size: 13px;
+}
+
+.saved-list a {
+    color: #315d4b;
+    white-space: nowrap;
+}
+
+
 </style>
