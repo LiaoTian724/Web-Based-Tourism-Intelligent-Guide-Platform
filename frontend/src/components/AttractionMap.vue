@@ -38,7 +38,6 @@ function createPopup(place) {
 // 更新地图标记
 function renderMarkers() {
     if (!markerLayer) return
-
     markerLayer.clearLayers()
     markers.clear()
 
@@ -83,10 +82,11 @@ function renderMarkers() {
     }
 }
 
+
+
 // 定位选中的景点
 function focusSelected() {
     if (!map || props.selectedId === null) return
-
     const marker = markers.get(props.selectedId)
     if (!marker) return
     map.setView(marker.getLatLng(), Math.max(map.getZoom(), 15))
@@ -101,9 +101,7 @@ onMounted(() => {
     L.tileLayer(
         'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
         {
-            maxZoom: 19,
-            attribution:
-                '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+            maxZoom: 19,   // 最大缩放级别是 19
         }
     ).addTo(map)
 
@@ -131,7 +129,9 @@ watch(
 
 // 离开页面时释放地图
 onUnmounted(() => {
-    map?.remove()
+    if (map !== null && map !== undefined) {
+        map.remove()
+    }
     map = null
 })
 </script>

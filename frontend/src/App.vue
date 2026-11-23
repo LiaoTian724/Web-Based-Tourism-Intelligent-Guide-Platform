@@ -300,7 +300,7 @@ onMounted(() => {
                 </section>
             </template>
 
-            <LocalListings v-else-if="activePage === 'discovery'" :attractions="attractions"/>
+            <LocalListings v-else-if="activePage === 'discovery'" :attractions="attractions" :account="account"/>
             <ItineraryPlanner v-else-if="activePage === 'planner'" :categories="categories"/>
             <MyBookmarks v-else />
         </main>

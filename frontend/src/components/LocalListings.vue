@@ -1,7 +1,12 @@
 <script setup>
 import { computed, onMounted, ref, watch } from 'vue'
 
-const props = defineProps({attractions: {type: Array, default: () => []}})
+/* <LocalListings v-else-if="activePage === 'discovery'" :attractions="attractions" :account="account"/> */
+// 看 App.vue  这里接受 :attractions 和 :account
+const props = defineProps({
+    attractions: {type: Array, default: () => []}, 
+    account: {type: Object, default: null}
+})
 
 // 页面数据
 const items = ref([])
@@ -45,7 +50,7 @@ async function loadListings() {
 
     try {
         const response = await fetch('/api/listings/', {
-            meothod: 'GET'
+            method: 'GET'
         })
 
         if (!response.ok) {throw new Error(`HTTP ${response.status}`)}
@@ -128,20 +133,25 @@ async function submitReview() {
 
 
 
-// 获取用户登录状态  GET
-async function loadAccount() {
-    try {
-        const response = await fetch('/api/account/', {
-            method: "GET"
-        })
-        if (response.ok) {account.value = await response.json()}
-    } catch (err) {
-        console.error(err)
-    }
-}
+// // 获取用户登录状态  GET
+// async function loadAccount() {
+//     try {
+//         const response = await fetch('/api/account/', {
+//             method: "GET"
+//         })
+//         if (response.ok) {account.value = await response.json()}
+//     } catch (err) {
+//         console.error(err)
+//     }
+// }
+
+
 
 
 // 获取 CSRF Token
+
+
+
 function getCsrfToken() {
     const cookie = document.cookie.split('; ').find(item => item.startsWith('csrftoken='))
     // 原来的字符串：sessionid=abc123; csrftoken=xyz789; theme=dark 变成
@@ -154,7 +164,8 @@ function getCsrfToken() {
 }
 
 
-// 收藏或取消收藏
+
+// 收藏或取消收藏   DELETE POST
 async function toggleBookmark(item) {
     // 如果没有登录，跳转到登录页面
     if (!account.value.authenticated) {
@@ -178,14 +189,18 @@ async function toggleBookmark(item) {
             window.location.href = `/accounts/login/?next=${encodeURIComponent(window.location.href)}`
             return
         }
-
         if (!response.ok) { throw new Error(`HTTP ${response.status}`) }
+
         const data = await response.json()
 
         // 更新收藏状态
-        items.value = items.value.map(listing =>
-            listing.id === item.id ? { ...listing, bookmarked: data.bookmarked } : listing
-        )
+        const newItems = []
+        for (const listing of items.value) {
+            if (listing.id === item.id) {
+                newItems.push({...listing, bookmarked: data.bookmarked})
+            } else {newItems.push(listing)}
+        }
+        items.value = newItems
 
     } catch (err) {
         actionError.value = err.message || '收藏操作失败'
@@ -216,10 +231,11 @@ const foodGroups = computed(() => {
     )]
 })
 
-// 当前距离参考点
+ 
+// 获取参考景点
 const referencePlace = computed(() => {
-    return props.attractions.find(
-        item => item.id === Number(referenceId.value)
+    // props 是 Vue 父组件向子组件传递的数据
+    return props.attractions.find(item => item.id === Number(referenceId.value)
     ) || props.attractions.find(
         item => item.name === '议事亭前地'
     ) || props.attractions[0] || null
@@ -227,12 +243,9 @@ const referencePlace = computed(() => {
 
 // 计算两点之间的直线距离
 function calculateDistance(place, item) {
-    if (!place || item.lat == null || item.lng == null) {
-        return null
-    }
+    if (!place || item.lat == null || item.lng == null) {return null}
 
     const rad = Math.PI / 180
-
     const lat1 = Number(place.lat)
     const lng1 = Number(place.lng)
     const lat2 = Number(item.lat)
@@ -266,20 +279,20 @@ const visibleItems = computed(() => {
                 item.address,
                 item.summary,
                 item.food_group_label
-            ].filter(Boolean).some(value =>
-                String(value).toLowerCase().includes(q)
-            )
+            ].filter(Boolean).some(value => String(value).toLowerCase().includes(q))    // some() 判断是否至少有一个字段匹配
 
             const matchesArea = !area.value || item.area === area.value
             const matchesLabel = !label.value || item.label === label.value
             const matchesGroup = !foodGroup.value || item.food_group === foodGroup.value
 
             return matchesKeyword && matchesArea && matchesLabel && matchesGroup
-        }).map(item => ({ ...item, distance: kind.value === 'food' ? calculateDistance(referencePlace.value, item) : null }))
+        }).map(item => ({ ...item, distance: kind.value === 'food' 
+                                        ? calculateDistance(referencePlace.value, item) 
+                                        : null }))
 
     if (sort.value === 'distance') {
-        results.sort((a, b) => (a.distance ?? Infinity) - (b.distance ?? Infinity))
-    } else { results.sort((a, b) => (b.rating ?? -1) - (a.rating ?? -1) || b.review_count - a.review_count) }
+        results.sort((a, b) => (a.distance ?? Infinity) - (b.distance ?? Infinity))  // 空值的时候用 ?? 右边的值
+    } else {results.sort((a, b) => (b.rating ?? -1) - (a.rating ?? -1) || b.review_count - a.review_count)}
 
     return results
 })
@@ -296,7 +309,7 @@ watch(kind, () => {
 })
 
 
-// 清空筛选
+// 清空筛选  全部改为 ""
 function resetFilters() {
     keyword.value = ''
     area.value = ''
@@ -495,11 +508,6 @@ onMounted(async () => {
 
                         <p v-if="!reviewLoading && !reviews.length">暂无公开评价</p>
                     </section>
-
-
-
-
-
                 </div>
             </div>
         </div>

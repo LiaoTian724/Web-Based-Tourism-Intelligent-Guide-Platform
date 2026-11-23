@@ -1,12 +1,12 @@
-<script setup>
+<!-- <script setup>
 import { computed, ref } from 'vue'
 
 const props = defineProps({
     categories: {type: Array, required: true}
 })
 
-// 从 App.vue 传入的分类中排除“全部分类”
-const interestOptions = computed(() =>props.categories.filter(item => item.value))
+
+const interestOptions = computed(() => props.categories.filter(item => item.value))
 
 // 用户输入
 const interests = ref([])
@@ -20,14 +20,14 @@ const trip = ref(null)
 // 获取 Django CSRF Token
 function getCsrfToken() {
     const cookie = document.cookie.split('; ').find(item => item.startsWith('csrftoken='))
-
     return cookie ? decodeURIComponent(cookie.split('=')[1]) : ''
 }
 
-// 生成规则行程
+
+
+// 生成规则行程   POST
 async function generatePlan() {
     if (loading.value) return
-
     loading.value = true
     error.value = ''
     trip.value = null
@@ -37,8 +37,9 @@ async function generatePlan() {
 
         // 若尚未取得 CSRF Cookie，先请求已有的账户接口
         if (!csrfToken) {
-            const accountResponse = await fetch('/api/account/')
-
+            const accountResponse = await fetch('/api/account/', {
+                method: "GET"
+            }) 
             if (!accountResponse.ok) {throw new Error('无法初始化请求，请刷新页面')}
             csrfToken = getCsrfToken()
         }
@@ -52,26 +53,152 @@ async function generatePlan() {
         })
 
         const data = await response.json().catch(() => null)
-
         if (!response.ok) {throw new Error(data?.error || `HTTP ${response.status}`)}
         if (!Array.isArray(data?.stops)) {throw new Error('服务器返回的行程格式不正确')}
-
         trip.value = data
-
     } catch (err) {
         error.value = err.message || '生成行程失败'
     } finally {
         loading.value = false
     }
 }
+</script> -->
+
+
+
+
+<script setup>
+import { computed, ref, watch } from 'vue'
+
+const props = defineProps({
+    categories: {type: Array, required: true},
+    account: {type: Object, default: null}
+})
+
+// 从 App.vue 传入的分类中排除“全部分类”
+// 从父组件传入的景点分类数组 categories 中，过滤掉 value 为空的选项，生成一个可以自动更新的兴趣选项列表 interestOptions
+const interestOptions = computed(() => props.categories.filter(item => item.value))
+
+const interests = ref([])
+const budgetMinutes = ref(180)
+
+// 页面状态
+const loading = ref(false)
+const error = ref('')
+const message = ref('')
+const trip = ref(null)
+
+const savedTrips = ref([])
+const savedError = ref('')
+
+
+function getCsrfToken() {
+    const cookie = document.cookie.split('; ').find(item => item.startsWith('csrftoken='))
+    return cookie ? decodeURIComponent(cookie.split('=')[1]) : ''
+}
+
+
+// 获取历史行程
+async function loadSavedTrips() {
+    savedError.value = ''
+    try {
+        const response = await fetch('/api/itineraries/', {credentials: 'same-origin'})
+        const data = await response.json().catch(() => null)
+
+        if (!response.ok) {throw new Error(data?.error || '获取历史行程失败')}
+        savedTrips.value = data.items || []
+    } catch (err) {
+        savedError.value = err.message
+    }
+}
+
+
+
+// 登录状态变化时加载历史行程
+watch(
+    () => props.account?.authenticated,
+    authenticated => {
+        if (authenticated) {
+            loadSavedTrips()
+        } else {
+            savedTrips.value = []
+        }
+    },
+    { immediate: true }  // 注册时先执行一次，以后数据变化时继续执行
+)
+
+
+// 生成或保存行程   POST
+async function generatePlan(save = false) {
+    if (loading.value) return
+
+    if (save && !props.account?.authenticated) {
+        error.value = '请登录后保存行程'
+        return
+    }
+    if (save && !trip.value?.stops.length) {return}
+
+    loading.value = true
+    error.value = ''
+    message.value = ''
+    if (!save) {trip.value = null}
+
+    try {
+        let csrfToken = getCsrfToken()
+        if (!csrfToken) {
+            await fetch('/api/account/')
+            csrfToken = getCsrfToken()
+        }
+        if (!csrfToken) {throw new Error('无法获取 CSRF Token')}
+
+        const payload = {
+            interests: interests.value,
+            budget_minutes: Number(budgetMinutes.value),
+            save: save
+        }
+        if (save) {
+            payload.stop_ids = trip.value.stops.map(stop => stop.id)        // 动态添加 stop_ids 属性
+        }
+
+        const response = await fetch('/api/itineraries/plan/', {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: {'Content-Type': 'application/json', 'X-CSRFToken': csrfToken},
+            body: JSON.stringify(payload)
+        })
+
+        const data = await response.json().catch(() => null)
+        if (!response.ok) {
+            throw new Error(data?.error || '请求失败')
+        }
+
+        trip.value = data
+
+        if (save && data.id) {
+            message.value = '行程已保存'
+            await loadSavedTrips()
+        } 
+    } catch (err) {
+        error.value = err.message || '生成行程失败'
+    } finally {
+        loading.value = false
+    }
+}
+
+
 </script>
+
+
+
+
+
 
 <template>
     <section class="planner-page">
         <div class="planner-layout">
 
             <!-- 左侧：用户输入 -->
-            <form class="plan-panel" @submit.prevent="generatePlan">
+            <form class="plan-panel" @submit.prevent="generatePlan(false)">
                 <h2>设置你的行程</h2>
 
                 <fieldset :disabled="loading">
@@ -123,6 +250,8 @@ async function generatePlan() {
         </div>
     </section>
 </template>
+
+
 
 <style scoped>
 .planner-page {
