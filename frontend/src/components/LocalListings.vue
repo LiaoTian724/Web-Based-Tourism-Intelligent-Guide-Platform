@@ -270,15 +270,11 @@ function distanceText(km) {
 // 搜索、筛选、排序
 const visibleItems = computed(() => {
     const q = keyword.value.trim().toLowerCase()
-
+    
     const results = currentItems.value
         .filter(item => {
             const matchesKeyword = !q || [
-                item.name,
-                item.label,
-                item.address,
-                item.summary,
-                item.food_group_label
+                item.name, item.label, item.address, item.summary, item.food_group_label
             ].filter(Boolean).some(value => String(value).toLowerCase().includes(q))    // some() 判断是否至少有一个字段匹配
 
             const matchesArea = !area.value || item.area === area.value
@@ -293,7 +289,6 @@ const visibleItems = computed(() => {
     if (sort.value === 'distance') {
         results.sort((a, b) => (a.distance ?? Infinity) - (b.distance ?? Infinity))  // 空值的时候用 ?? 右边的值
     } else {results.sort((a, b) => (b.rating ?? -1) - (a.rating ?? -1) || b.review_count - a.review_count)}
-
     return results
 })
 
