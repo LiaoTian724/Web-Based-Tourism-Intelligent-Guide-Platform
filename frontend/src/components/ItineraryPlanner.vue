@@ -30,11 +30,14 @@ function getCsrfToken() {
 }
 
 
-// 获取历史行程
+// 获取历史行程   GET
 async function loadSavedTrips() {
     savedError.value = ''
     try {
-        const response = await fetch('/api/itineraries/', {credentials: 'same-origin'})
+        const response = await fetch('/api/itineraries/', {
+            method: "GET",
+            credentials: 'same-origin'
+        })
         const data = await response.json().catch(() => null)
 
         if (!response.ok) {throw new Error(data?.error || '获取历史行程失败')}
@@ -116,7 +119,6 @@ async function generatePlan(save = false) {
         loading.value = false
     }
 }
-
 
 </script>
 

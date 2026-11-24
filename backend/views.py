@@ -6,7 +6,7 @@ from django.shortcuts import render
 from django.http import JsonResponse
 from django.db.models import Q
 from django.views.decorators.http import require_GET, require_POST
-from .models import Attraction, Category, Region
+from .models import Attraction, Category, Region, SightType, Itinerary, ItineraryStop
 import json
 from urllib.parse import urlencode 
 from .forms import PlanForm
@@ -14,15 +14,44 @@ from .planner import build_plan
 from django.db import transaction
 from django.http import HttpResponse
 from django.shortcuts import get_object_or_404
-from .models import Itinerary, ItineraryStop
+
+# 照片
+from django.contrib.staticfiles import finders
+from django.contrib.staticfiles.storage import staticfiles_storage
+
 
 @require_GET
 def healthz(request):
     return JsonResponse({"status": "ok", "service": "macau-tourism"})
 
 
+SIGHT_TOPICS = {"heritage": "澳门世界遗产", **dict(SightType.choices)}
+
+
 # 给地点加属性
 def attraction_to_dict(place):
+    if place.world_heritage:
+        topics = ["heritage"]
+    else:
+        topics = []
+
+    if place.sight_type:
+        topics.append(place.sight_type)
+    elif not topics:
+        topics.append(SightType.OTHER)
+
+    # place.world_heritage = True
+    # place.sight_type = "churches"
+    # topics = ["heritage", "churches"]
+
+    image_url = ""
+    for ext in ["webp", "jpg", "jpeg", "png"]:
+        path = f"attractions/{place.slug}.{ext}"
+
+        if finders.find(path):
+            image_url = staticfiles_storage.url(path)
+            break
+
     return {
         "id": place.id,
         "slug": place.slug,
@@ -31,6 +60,7 @@ def attraction_to_dict(place):
         "category": place.category,
         "category_label": place.get_category_display(),
         "sight_type": place.sight_type,
+        "sight_topics": [{"id": key, "name": SIGHT_TOPICS[key]} for key in topics],
         "region": place.region,
         "region_label": place.get_region_display(),
         "world_heritage": place.world_heritage,
@@ -45,31 +75,75 @@ def attraction_to_dict(place):
         "lng": float(place.longitude),
         "source_url": place.source_url,
         "artwork": place.artwork,
+        "image_url": image_url,
     }
 
 
-@require_GET
-def attractions(request):
+
+
+# 根据主题生成数据库查询条件
+def sight_topic_filter(theme):
+    if theme == "heritage":
+        return Q(world_heritage=True)
+
+    if theme == SightType.OTHER:
+        return (Q(sight_type=SightType.OTHER) | Q(sight_type="", world_heritage=False))
+    return Q(sight_type=theme)
+
+
+# 统一处理景点筛选
+def filtered_attractions(request):
     places = Attraction.objects.filter(enabled=True)
 
-    # 搜索
+    # 1. 关键词搜索
     query = request.GET.get("q", "").strip()[:120]
-
     if query:
         places = places.filter(Q(name__icontains=query) | Q(name_en__icontains=query) | Q(address__icontains=query))
 
-    # 分类筛选
+    # 2. 基础分类
     category = request.GET.get("category", "")
     if category in Category.values:
         places = places.filter(category=category)
 
-    # 区域筛选
+    # 3. 观光主题
+    theme = request.GET.get("theme")
+    if theme in SIGHT_TOPICS:
+        places = places.filter(sight_topic_filter(theme))
+
+    # 4. 地区
     region = request.GET.get("region", "")
     if region in Region.values:
         places = places.filter(region=region)
 
+    # 5. 小众景点
+    if request.GET.get("less_known") == "1":
+        places = places.filter(less_known=True)
+
+    return places
+
+
+
+@require_GET
+def attractions(request):
+    places = filtered_attractions(request)
     items = [attraction_to_dict(place) for place in places]
-    return JsonResponse({"count": len(items), "items": items})
+    return JsonResponse({"count": len(items),  "items": items})
+
+
+
+# 导出景点 Markdown
+@require_GET
+def export_attractions(request):
+    lines = ["# 澳门景点列表", ""]
+
+    for place in filtered_attractions(request):
+        lines.append(
+            f"- {place.name} · "
+            f"{place.get_category_display()} · "
+            f"{place.address}"
+        )
+
+    return markdown_download(lines, "macau-attractions.md")
 
 
 

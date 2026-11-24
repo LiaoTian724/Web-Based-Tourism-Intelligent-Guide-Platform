@@ -132,26 +132,7 @@ async function submitReview() {
 
 
 
-
-// // 获取用户登录状态  GET
-// async function loadAccount() {
-//     try {
-//         const response = await fetch('/api/account/', {
-//             method: "GET"
-//         })
-//         if (response.ok) {account.value = await response.json()}
-//     } catch (err) {
-//         console.error(err)
-//     }
-// }
-
-
-
-
 // 获取 CSRF Token
-
-
-
 function getCsrfToken() {
     const cookie = document.cookie.split('; ').find(item => item.startsWith('csrftoken='))
     // 原来的字符串：sessionid=abc123; csrftoken=xyz789; theme=dark 变成
@@ -263,7 +244,6 @@ function distanceText(km) {
     if (km < 1) {
         return `${Math.round(km * 1000)} 米`
     }
-
     return `${km.toFixed(1)} 公里`
 }
 

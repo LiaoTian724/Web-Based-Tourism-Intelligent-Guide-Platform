@@ -18,6 +18,8 @@ const accountError = ref(false)
 const keyword = ref('')
 const region = ref('')
 const category = ref('')
+const theme = ref('')
+const lessKnownOnly = ref(false)
 
 // 页面状态
 const loading = ref(false)
@@ -39,6 +41,16 @@ const categories = [
     { value: 'photography', label: '摄影打卡' },
     { value: 'food', label: '美食体验' }
 ]
+const themes = [
+    { value: '', label: '全部主题' },
+    { value: 'heritage', label: '澳门世界遗产' },
+    { value: 'museums', label: '博物馆及展览厅' },
+    { value: 'churches', label: '教堂' },
+    { value: 'temples', label: '庙宇' },
+    { value: 'parks', label: '公园' },
+    { value: 'fortresses', label: '炮台' },
+    { value: 'other', label: '其他景点' }
+]
 
 // 当前选中的景点
 const selectedId = ref(null)
@@ -57,18 +69,34 @@ function googleMapsUrl(place) {
 }
 
 
+
+function buildAttractionParams() {
+    const params = new URLSearchParams()
+
+    if (keyword.value.trim()) {params.set('q', keyword.value.trim())}
+    if (region.value) {params.set('region', region.value)}
+    if (category.value) {params.set('category', category.value)}
+    if (theme.value) {params.set('theme', theme.value)}
+    if (lessKnownOnly.value) {params.set('less_known', '1')}
+
+    return params
+}
+
+
+// 当前筛选条件对应的下载地址
+const exportUrl = computed(() => {
+    const query = buildAttractionParams().toString()
+
+    return query ? `/api/attractions/export/?${query}` : '/api/attractions/export/'
+})
+
+
 // 从 Django 获取景点
 async function loadAttractions() {
     loading.value = true
     error.value = ''
 
-    // 构建 URL 参数
-    const params = new URLSearchParams()
-
-    if (keyword.value.trim()) { params.set('q', keyword.value.trim()) }
-    if (region.value) { params.set('region', region.value) }
-    if (category.value) { params.set('category', category.value) }
-
+    const params = buildAttractionParams()
     const query = params.toString()
     const url = query ? `/api/attractions/?${query}` : '/api/attractions/'
 
@@ -95,7 +123,8 @@ function resetFilters() {
     keyword.value = ''
     region.value = ''
     category.value = ''
-
+    theme.value = ''
+    lessKnownOnly.value = false
     loadAttractions()
 }
 
@@ -201,20 +230,30 @@ onMounted(() => {
                         <label>
                             <span>选择区域</span>
                             <select v-model="region">
-                                <option v-for="item in regions" :key="item.value" :value="item.value">{{ item.label }}
-                                </option>
+                                <option v-for="item in regions" :key="item.value" :value="item.value">{{ item.label }}</option>
                             </select>
                         </label>
 
                         <label>
                             <span>选择分类</span>
                             <select v-model="category">
-                                <option v-for="item in categories" :key="item.value" :value="item.value">{{ item.label
-                                    }}</option>
+                                <option v-for="item in categories" :key="item.value" :value="item.value">{{ item.label }}</option>
+                            </select>
+                        </label>
+                        <label>
+                            <span>选择观光主题</span>
+                            <select v-model="theme">
+                                <option v-for="item in themes" :key="item.value" :value="item.value">
+                                    {{ item.label }}
+                                </option>
                             </select>
                         </label>
 
                         <div class="actions">
+                            <label class="checkbox-filter">
+                                <input v-model="lessKnownOnly" type="checkbox">
+                                <span>只看小众景点</span>
+                            </label>
                             <button type="submit">搜索</button>
                             <button type="button" class="reset" @click="resetFilters">重置</button>
                         </div>
@@ -259,7 +298,12 @@ onMounted(() => {
                             <h2>探索景点</h2>
                         </div>
 
-                        <span>{{ attractions.length }} 个景点</span>
+                        <div class="results-actions">
+                            <span>{{ attractions.length }} 个景点</span>
+                            <a :href="exportUrl" class="export-link">
+                                导出当前结果 ↓
+                            </a>
+                        </div>
                     </div>
 
                     <div v-if="loading" class="message">正在加载景点...</div>
@@ -267,8 +311,8 @@ onMounted(() => {
                     <div v-else-if="error" class="message error">{{ error }}</div>
 
                     <div v-else-if="attractions.length" class="card-grid">
-                        <article v-for="place in attractions" :key="place.id"
-                            :class="['place-card', { selected: selectedId === place.id }]">
+                        <article v-for="place in attractions" :key="place.id" :class="['place-card', { selected: selectedId === place.id }]">
+                            <img v-if="place.image_url" :src="place.image_url" :alt="place.name" class="place-image" loading="lazy">
                             <div class="card-tags">
                                 <span class="category">{{ place.category_label }}</span>
                                 <span>{{ place.region_label }}</span>
@@ -288,7 +332,9 @@ onMounted(() => {
 
                             <div class="card-footer">
                                 <span>{{ place.visit_minutes }} 分钟</span>
-                                <span v-if="place.world_heritage">世界遗产</span>
+                                <span v-for="topic in place.sight_topics" :key="topic.id">
+                                    {{ topic.name }}
+                                </span>
                                 <span v-if="place.less_known">小众景点</span>
                                 <button type="button" class="map-select"
                                     @click="selectAttraction(place.id)">地图定位</button>

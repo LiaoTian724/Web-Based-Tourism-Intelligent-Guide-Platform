@@ -1071,3 +1071,68 @@ footer {
         flex: 1 1 auto;
     }
 }
+
+
+
+/* 景点主题筛选 */
+
+.search-panel form {
+    grid-template-columns: 2fr 1fr 1fr 1fr auto;
+}
+
+.actions {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.search-panel .checkbox-filter {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 8px;
+    white-space: nowrap;
+}
+
+.search-panel .checkbox-filter input {
+    width: 16px;
+    height: 16px;
+    padding: 0;
+    margin: 0;
+}
+
+
+/* 景点导出 */
+
+.results-actions {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+}
+
+.export-link {
+    color: #315d4b;
+    font-size: 13px;
+    text-decoration: none;
+    white-space: nowrap;
+}
+
+.export-link:hover {
+    text-decoration: underline;
+}
+
+@media (max-width: 600px) {
+    .results-actions {
+        flex-wrap: wrap;
+        justify-content: flex-end;
+    }
+}
+
+.place-image {
+    width: 100%;
+    height: 190px;
+    object-fit: cover;
+    border-radius: 10px;
+    margin-bottom: 14px;
+}

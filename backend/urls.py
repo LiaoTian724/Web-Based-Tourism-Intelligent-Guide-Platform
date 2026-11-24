@@ -6,6 +6,8 @@ from .forms import LoginForm
 urlpatterns = [
     path("api/healthz/", views.healthz, name="healthz"),
 
+
+    path("api/attractions/export/", views.export_attractions, name="export-attractions"),
     path("api/attractions/", views.attractions, name="attractions"),
 
     path("api/listings/", community.listings, name="listings"),
