@@ -24,7 +24,7 @@ const referenceId = ref('')
 const selectedItem = ref(null)
 
 // 用户登录状态
-const account = ref({ authenticated: false })
+// const account = ref({ authenticated: false })
 
 // 收藏操作状态
 const bookmarkLoadingId = ref(null)
@@ -149,7 +149,7 @@ function getCsrfToken() {
 // 收藏或取消收藏   DELETE POST
 async function toggleBookmark(item) {
     // 如果没有登录，跳转到登录页面
-    if (!account.value.authenticated) {
+    if (!props.account?.authenticated) {
         window.location.href = `/accounts/login/?next=${encodeURIComponent(window.location.href)}`
         return
     }
@@ -296,7 +296,7 @@ function resetFilters() {
 
 // 页面初始化
 onMounted(async () => {
-    await loadAccount()
+    // await loadAccount()
     await loadListings()
 })
 </script>

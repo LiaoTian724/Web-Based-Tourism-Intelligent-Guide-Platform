@@ -42,3 +42,5 @@ chat.db-*
 *.[dD][oO][cC][xX]
 *.[pP][dD][fF]
 
+# 本地景点图片
+/backend/static/
