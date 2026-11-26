@@ -44,3 +44,17 @@ chat.db-*
 
 # 本地景点图片
 /backend/static/
+
+
+
+
+# Local tourism datasets
+/backend/data/
+/DATA/
+/local-data/
+
+# Local photo metadata
+/frontend/src/placePhotoCredits.json
+
+# Local attraction and listing photos
+/backend/static/

@@ -18,6 +18,7 @@ from django.shortcuts import get_object_or_404
 # 照片
 from django.contrib.staticfiles import finders
 from django.contrib.staticfiles.storage import staticfiles_storage
+from .image_utils import find_image
 
 
 @require_GET
@@ -44,13 +45,9 @@ def attraction_to_dict(place):
     # place.sight_type = "churches"
     # topics = ["heritage", "churches"]
 
-    image_url = ""
-    for ext in ["webp", "jpg", "jpeg", "png"]:
-        path = f"attractions/{place.slug}.{ext}"
-
-        if finders.find(path):
-            image_url = staticfiles_storage.url(path)
-            break
+    image_url = find_image("attractions", place.artwork)
+    if not image_url:
+        image_url = find_image("attractions", place.slug)
 
     return {
         "id": place.id,

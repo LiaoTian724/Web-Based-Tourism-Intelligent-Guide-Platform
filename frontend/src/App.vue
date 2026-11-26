@@ -160,7 +160,6 @@ onMounted(() => {
 
 <template>
     <div class="page">
-
         <header class="header">
             <div class="brand">
                 <div class="brand-icon">澳</div>
@@ -178,7 +177,7 @@ onMounted(() => {
                 <button :class="{ active: activePage === 'planner' }" @click="activePage = 'planner'">行程规划</button>
             </nav>
 
-            <!-- 用户登录状态 -->
+            <!-- 用户登录状态, 就是检查是否登录 -->
             <div class="header-account">
                 <span v-if="accountError">登录状态获取失败</span>
                 <template v-else-if="account?.authenticated">
@@ -203,10 +202,8 @@ onMounted(() => {
         </header>
 
         <main class="container">
-
             <section class="hero">
                 <p class="eyebrow">DISCOVER MACAO</p>
-
                 <h1 v-if="activePage === 'attractions'">在澳门，发现城市的另一面。</h1>
                 <h1 v-else-if="activePage === 'discovery'"> 从街头味道到澳门手信。 </h1>
                 <h1 v-else-if="activePage === 'planner'"> 规划属于你的澳门漫步。 </h1>
@@ -221,41 +218,36 @@ onMounted(() => {
             <!-- 搜索和筛选 -->
             <template v-if="activePage === 'attractions'">
                 <section class="search-panel">
-
                     <form @submit.prevent="loadAttractions">
                         <label><span>搜索景点</span>
-                            <input v-model="keyword" type="search" placeholder="输入景点名称、英文名称或地址" />
+                            <el-input v-model="keyword" type="search" placeholder="输入景点名称、英文名称或地址" clearable/>
                         </label>
 
                         <label>
                             <span>选择区域</span>
-                            <select v-model="region">
-                                <option v-for="item in regions" :key="item.value" :value="item.value">{{ item.label }}</option>
-                            </select>
+                            <el-select v-model="region">
+                                <el-option v-for="item in regions" :key="item.value"  :label="item.label" :value="item.value"/>
+                            </el-select>
                         </label>
 
                         <label>
                             <span>选择分类</span>
-                            <select v-model="category">
-                                <option v-for="item in categories" :key="item.value" :value="item.value">{{ item.label }}</option>
-                            </select>
+                            <el-select v-model="category">
+                                <el-option  v-for="item in categories" :key="item.value"  :label="item.label" :value="item.value"/>
+                            </el-select>
                         </label>
+
                         <label>
                             <span>选择观光主题</span>
-                            <select v-model="theme">
-                                <option v-for="item in themes" :key="item.value" :value="item.value">
-                                    {{ item.label }}
-                                </option>
-                            </select>
+                            <el-select v-model="theme">
+                                <el-option  v-for="item in themes"  :key="item.value"  :label="item.label"  :value="item.value"/>
+                            </el-select>
                         </label>
 
                         <div class="actions">
-                            <label class="checkbox-filter">
-                                <input v-model="lessKnownOnly" type="checkbox">
-                                <span>只看小众景点</span>
-                            </label>
-                            <button type="submit">搜索</button>
-                            <button type="button" class="reset" @click="resetFilters">重置</button>
+                            <el-checkbox v-model="lessKnownOnly" class="checkbox-filter">只看小众景点</el-checkbox>
+                            <el-button type="primary" native-type="submit">搜索</el-button>
+                            <el-button native-type="button" class="reset" @click="resetFilters">重置</el-button>
                         </div>
                     </form>
 
@@ -282,8 +274,7 @@ onMounted(() => {
                         </div>
 
                         <div class="selected-actions">
-                            <a :href="googleMapsUrl(selectedPlace)" target="_blank" rel="noopener noreferrer">Google
-                                Maps 导航 ↗</a>
+                            <a :href="googleMapsUrl(selectedPlace)" target="_blank" rel="noopener noreferrer">Google Maps 导航 ↗</a>
                             <button type="button" class="reset" @click="selectedId = null">取消选择</button>
                         </div>
                     </div>
@@ -300,16 +291,12 @@ onMounted(() => {
 
                         <div class="results-actions">
                             <span>{{ attractions.length }} 个景点</span>
-                            <a :href="exportUrl" class="export-link">
-                                导出当前结果 ↓
-                            </a>
+                            <a :href="exportUrl" class="export-link">导出当前结果 ↓</a>
                         </div>
                     </div>
 
                     <div v-if="loading" class="message">正在加载景点...</div>
-
                     <div v-else-if="error" class="message error">{{ error }}</div>
-
                     <div v-else-if="attractions.length" class="card-grid">
                         <article v-for="place in attractions" :key="place.id" :class="['place-card', { selected: selectedId === place.id }]">
                             <img v-if="place.image_url" :src="place.image_url" :alt="place.name" class="place-image" loading="lazy">
@@ -321,7 +308,6 @@ onMounted(() => {
                             <h3>{{ place.name }}</h3>
 
                             <p v-if="place.name_en" class="english">{{ place.name_en }}</p>
-
                             <p class="summary">{{ place.summary }}</p>
 
                             <div class="details">

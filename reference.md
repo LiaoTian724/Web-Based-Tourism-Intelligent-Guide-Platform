@@ -34,3 +34,11 @@ npm install
 
 
 npm install leaflet@1.9.4
+
+
+
+cd frontend
+npm install leaflet
+
+cd frontend
+npm install element-plus

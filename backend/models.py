@@ -51,7 +51,7 @@ class Attraction(models.Model):
     latitude = models.DecimalField("纬度", max_digits=8, decimal_places=6)
     longitude = models.DecimalField("经度", max_digits=9, decimal_places=6)
     source_url = models.URLField("资料来源", blank=True)
-    artwork = models.CharField("插画样式", max_length=24, blank=True)
+    artwork = models.CharField("插画样式", max_length=64, blank=True)
     enabled = models.BooleanField("公开显示", default=True)
 
 
@@ -113,6 +113,7 @@ class FoodGroup(models.TextChoices):
     PORTUGUESE = "portuguese", "土生菜及葡国菜"
     SNACKS = "snacks", "地道小吃"
     CAFES = "cafes", "茶餐厅与粉面"
+    SPECIALTY = "specialty", "风味餐厅"
 
 
 class LocalListing(models.Model):

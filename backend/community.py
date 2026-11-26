@@ -11,16 +11,12 @@ from .models import Bookmark, ListingKind, LocalListing, Review, ReviewStatus
 from django.contrib.staticfiles.storage import staticfiles_storage
 from .discovery_photos import PHOTO_CREDITS, SVG_IMAGE_KEYS
 
+from .image_utils import find_image
 
 def listing_to_dict(item, bookmarked_ids):
     #  onvert one LocalListing record into the frontend JSON format.
-    # 生成图片 URL
-    image_url = ""
-
-    if item.image_key:
-        extension = "svg" if item.image_key in SVG_IMAGE_KEYS else "webp"
-
-        image_url = staticfiles_storage.url(f"discovery/{item.image_key}.{extension}")
+    
+    image_url = find_image("discovery", item.image_key)
 
     # 获取图片版权信息
     image_credit = PHOTO_CREDITS.get(item.image_key)
