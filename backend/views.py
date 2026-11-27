@@ -16,9 +16,8 @@ from django.http import HttpResponse
 from django.shortcuts import get_object_or_404
 
 # 照片
-from django.contrib.staticfiles import finders
-from django.contrib.staticfiles.storage import staticfiles_storage
 from .image_utils import find_image
+from .interests import tag_labels
 
 
 @require_GET
@@ -56,6 +55,8 @@ def attraction_to_dict(place):
         "name_en": place.name_en,
         "category": place.category,
         "category_label": place.get_category_display(),
+        "tags": place.tags,
+        "tag_labels": tag_labels(place.tags),
         "sight_type": place.sight_type,
         "sight_topics": [{"id": key, "name": SIGHT_TOPICS[key]} for key in topics],
         "region": place.region,

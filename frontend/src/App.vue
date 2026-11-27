@@ -4,13 +4,18 @@ import AttractionMap from './components/AttractionMap.vue'
 import LocalListings from './components/LocalListings.vue'
 import MyBookmarks from './components/MyBookmarks.vue'
 import ItineraryPlanner from './components/ItineraryPlanner.vue'
+import { recordDetailView } from './utils/interactions.js'
 
 // 景点数据
+// 完整景点目录
+const allAttractions = ref([])
+// 当前筛选后的景点
 const attractions = ref([])
 const activePage = ref('attractions')
 
 // 用户信息
 const account = ref(null)
+const accountReady = ref(null)
 const csrfToken = ref('')
 const accountError = ref(false)
 
@@ -20,6 +25,9 @@ const region = ref('')
 const category = ref('')
 const theme = ref('')
 const lessKnownOnly = ref(false)
+
+// 最后一次成功查询使用的参数
+const appliedQuery = ref(null)
 
 // 页面状态
 const loading = ref(false)
@@ -54,6 +62,8 @@ const themes = [
 
 // 当前选中的景点
 const selectedId = ref(null)
+const detailPlace = ref(null)
+const detailVisible = ref(false)
 
 // 根据 ID 找到景点
 const selectedPlace = computed(() => {
@@ -62,6 +72,16 @@ const selectedPlace = computed(() => {
 
 // 选择景点
 function selectAttraction(id) { selectedId.value = id }
+
+function openAttractionDetails(place) {
+    detailPlace.value = place
+    detailVisible.value = true
+    void recordDetailView({
+        account: account.value ?? accountReady.value,
+        targetType: 'attraction',
+        targetId: place.id
+    })
+}
 
 // Google Maps 导航
 function googleMapsUrl(place) {
@@ -73,39 +93,65 @@ function googleMapsUrl(place) {
 function buildAttractionParams() {
     const params = new URLSearchParams()
 
-    if (keyword.value.trim()) {params.set('q', keyword.value.trim())}
-    if (region.value) {params.set('region', region.value)}
-    if (category.value) {params.set('category', category.value)}
-    if (theme.value) {params.set('theme', theme.value)}
-    if (lessKnownOnly.value) {params.set('less_known', '1')}
+    if (keyword.value.trim()) { params.set('q', keyword.value.trim()) }
+    if (region.value) { params.set('region', region.value) }
+    if (category.value) { params.set('category', category.value) }
+    if (theme.value) { params.set('theme', theme.value) }
+    if (lessKnownOnly.value) { params.set('less_known', '1') }
 
     return params
 }
 
 
-// 当前筛选条件对应的下载地址
+// 根据最后一次成功查询生成导出地址
 const exportUrl = computed(() => {
-    const query = buildAttractionParams().toString()
+    const query = appliedQuery.value
 
-    return query ? `/api/attractions/export/?${query}` : '/api/attractions/export/'
+    if (query === null) {
+        return ''
+    }
+
+    return query
+        ? `/api/attractions/export/?${query}`
+        : '/api/attractions/export/'
 })
+
+
+// 获取完整景点目录，不使用任何筛选条件
+async function loadAllAttractions() {
+    try {
+        const response = await fetch('/api/attractions/')
+        if (!response.ok) { throw new Error(`HTTP ${response.status}`) }
+
+        const data = await response.json()
+        allAttractions.value = data.items || []
+    } catch (err) {
+        console.error('获取完整景点目录失败:', err)
+    }
+}
 
 
 // 从 Django 获取景点
 async function loadAttractions() {
+    // 避免重复发送请求
+    if (loading.value) return
+
     loading.value = true
     error.value = ''
 
     const params = buildAttractionParams()
     const query = params.toString()
-    const url = query ? `/api/attractions/?${query}` : '/api/attractions/'
 
+    const url = query  ? `/api/attractions/?${query}` : '/api/attractions/'
     try {
         const response = await fetch(url)
-        if (!response.ok) { throw new Error(`HTTP ${response.status}`) }
 
+        if (!response.ok) {throw new Error(`HTTP ${response.status}`)}
         const data = await response.json()
+
+        // 更新景点列表
         attractions.value = data.items || []
+        appliedQuery.value = query   // 保存本次成功查询的参数
 
         // 如果筛选后景点不存在，清除原来的选择
         if (!attractions.value.some(place => place.id === selectedId.value)) {
@@ -118,6 +164,7 @@ async function loadAttractions() {
     }
 }
 
+
 // 重置筛选
 function resetFilters() {
     keyword.value = ''
@@ -125,7 +172,7 @@ function resetFilters() {
     category.value = ''
     theme.value = ''
     lessKnownOnly.value = false
-    loadAttractions()
+    loadAllAttractions()
 }
 
 
@@ -136,7 +183,7 @@ async function loadAccount() {
             method: 'GET'
         })
 
-        if (!response.ok) {throw new Error('获取用户信息失败')}
+        if (!response.ok) { throw new Error('获取用户信息失败') }
         account.value = await response.json()
         const cookie = document.cookie.split('; ').find(item => item.startsWith('csrftoken='))
         csrfToken.value = cookie ? decodeURIComponent(cookie.split('=')[1]) : ''
@@ -144,14 +191,16 @@ async function loadAccount() {
         accountError.value = true
         console.error(err)
     }
+    return account.value
 }
 
 
 
 // 页面加载后获取数据
 onMounted(() => {
+    loadAllAttractions()
     loadAttractions()
-    loadAccount()
+    accountReady.value = loadAccount()
 })
 
 
@@ -171,7 +220,8 @@ onMounted(() => {
             </div>
 
             <nav class="main-nav">
-                <button :class="{ active: activePage === 'attractions' }" @click="activePage = 'attractions'">景点探索</button>
+                <button :class="{ active: activePage === 'attractions' }"
+                    @click="activePage = 'attractions'">景点探索</button>
                 <button :class="{ active: activePage === 'discovery' }" @click="activePage = 'discovery'">美食与文创</button>
                 <button :class="{ active: activePage === 'bookmarks' }" @click="activePage = 'bookmarks'">我的收藏</button>
                 <button :class="{ active: activePage === 'planner' }" @click="activePage = 'planner'">行程规划</button>
@@ -183,10 +233,11 @@ onMounted(() => {
                 <template v-else-if="account?.authenticated">
                     <span>你好，{{ account.account }}</span>
 
-                    <a v-if="account.staff" href="http://127.0.0.1:8008/admin/" target="_blank" rel="noopener noreferrer">管理后台</a>
+                    <a v-if="account.staff" href="http://127.0.0.1:8008/admin/" target="_blank"
+                        rel="noopener noreferrer">管理后台</a>
 
                     <form method="post" action="/accounts/logout/">
-                        <input type="hidden"  name="csrfmiddlewaretoken" :value="csrfToken">
+                        <input type="hidden" name="csrfmiddlewaretoken" :value="csrfToken">
                         <button type="submit">退出登录</button>
                     </form>
                 </template>
@@ -220,34 +271,37 @@ onMounted(() => {
                 <section class="search-panel">
                     <form @submit.prevent="loadAttractions">
                         <label><span>搜索景点</span>
-                            <el-input v-model="keyword" type="search" placeholder="输入景点名称、英文名称或地址" clearable/>
+                            <el-input v-model="keyword" type="search" placeholder="输入景点名称、英文名称或地址" clearable />
                         </label>
 
                         <label>
                             <span>选择区域</span>
                             <el-select v-model="region">
-                                <el-option v-for="item in regions" :key="item.value"  :label="item.label" :value="item.value"/>
+                                <el-option v-for="item in regions" :key="item.value" :label="item.label"
+                                    :value="item.value" />
                             </el-select>
                         </label>
 
                         <label>
                             <span>选择分类</span>
                             <el-select v-model="category">
-                                <el-option  v-for="item in categories" :key="item.value"  :label="item.label" :value="item.value"/>
+                                <el-option v-for="item in categories" :key="item.value" :label="item.label"
+                                    :value="item.value" />
                             </el-select>
                         </label>
 
                         <label>
                             <span>选择观光主题</span>
                             <el-select v-model="theme">
-                                <el-option  v-for="item in themes"  :key="item.value"  :label="item.label"  :value="item.value"/>
+                                <el-option v-for="item in themes" :key="item.value" :label="item.label"
+                                    :value="item.value" />
                             </el-select>
                         </label>
 
                         <div class="actions">
                             <el-checkbox v-model="lessKnownOnly" class="checkbox-filter">只看小众景点</el-checkbox>
-                            <el-button type="primary" native-type="submit">搜索</el-button>
-                            <el-button native-type="button" class="reset" @click="resetFilters">重置</el-button>
+                            <el-button type="primary" native-type="submit" :loading="loading">搜索</el-button>
+                            <el-button native-type="button" :disabled="loading" @click="resetFilters">重置</el-button>
                         </div>
                     </form>
 
@@ -274,7 +328,8 @@ onMounted(() => {
                         </div>
 
                         <div class="selected-actions">
-                            <a :href="googleMapsUrl(selectedPlace)" target="_blank" rel="noopener noreferrer">Google Maps 导航 ↗</a>
+                            <a :href="googleMapsUrl(selectedPlace)" target="_blank" rel="noopener noreferrer">Google
+                                Maps 导航 ↗</a>
                             <button type="button" class="reset" @click="selectedId = null">取消选择</button>
                         </div>
                     </div>
@@ -291,15 +346,17 @@ onMounted(() => {
 
                         <div class="results-actions">
                             <span>{{ attractions.length }} 个景点</span>
-                            <a :href="exportUrl" class="export-link">导出当前结果 ↓</a>
+                            <a v-if="exportUrl && !loading && !error" :href="exportUrl" class="export-link">导出当前结果 ↓</a>
                         </div>
                     </div>
 
                     <div v-if="loading" class="message">正在加载景点...</div>
                     <div v-else-if="error" class="message error">{{ error }}</div>
                     <div v-else-if="attractions.length" class="card-grid">
-                        <article v-for="place in attractions" :key="place.id" :class="['place-card', { selected: selectedId === place.id }]">
-                            <img v-if="place.image_url" :src="place.image_url" :alt="place.name" class="place-image" loading="lazy">
+                        <article v-for="place in attractions" :key="place.id"
+                            :class="['place-card', { selected: selectedId === place.id }]">
+                            <img v-if="place.image_url" :src="place.image_url" :alt="place.name" class="place-image"
+                                loading="lazy">
                             <div class="card-tags">
                                 <span class="category">{{ place.category_label }}</span>
                                 <span>{{ place.region_label }}</span>
@@ -323,6 +380,8 @@ onMounted(() => {
                                 </span>
                                 <span v-if="place.less_known">小众景点</span>
                                 <button type="button" class="map-select"
+                                    @click="openAttractionDetails(place)">查看详情</button>
+                                <button type="button" class="map-select"
                                     @click="selectAttraction(place.id)">地图定位</button>
                             </div>
                         </article>
@@ -332,10 +391,32 @@ onMounted(() => {
                 </section>
             </template>
 
-            <LocalListings v-else-if="activePage === 'discovery'" :attractions="attractions" :account="account"/>
-            <ItineraryPlanner v-else-if="activePage === 'planner'" :categories="categories" :account="account"/>
+            <LocalListings v-else-if="activePage === 'discovery'" :attractions="allAttractions" :account="account"
+                :account-ready="accountReady" />
+            <ItineraryPlanner v-else-if="activePage === 'planner'" :categories="categories" :account="account" />
             <MyBookmarks v-else />
         </main>
+
+        <el-dialog v-model="detailVisible" :title="detailPlace?.name" width="min(640px, 92vw)">
+            <template v-if="detailPlace">
+                <img v-if="detailPlace.image_url" :src="detailPlace.image_url" :alt="detailPlace.name"
+                    class="place-image">
+                <p v-if="detailPlace.name_en" class="english">{{ detailPlace.name_en }}</p>
+                <p>{{ detailPlace.summary }}</p>
+                <p v-if="detailPlace.history">{{ detailPlace.history }}</p>
+                <p v-if="detailPlace.tag_labels?.length">特色：{{ detailPlace.tag_labels.join(' · ') }}</p>
+                <div class="details">
+                    <p><span>地址</span>{{ detailPlace.address }}</p>
+                    <p><span>开放时间</span>{{ detailPlace.hours }}</p>
+                    <p><span>门票</span>{{ detailPlace.admission }}</p>
+                    <p><span>建议停留</span>{{ detailPlace.visit_minutes }} 分钟</p>
+                </div>
+                <p v-if="detailPlace.source_url">
+                    <a :href="detailPlace.source_url" target="_blank" rel="noopener noreferrer">查看资料来源 ↗</a>
+                </p>
+                <a :href="googleMapsUrl(detailPlace)" target="_blank" rel="noopener noreferrer">Google Maps 导航 ↗</a>
+            </template>
+        </el-dialog>
 
         <footer>澳門漫遊 · MACAO CULTURAL GUIDE</footer>
     </div>

@@ -2,7 +2,8 @@ from django import forms
 from django.contrib.auth.forms import AuthenticationForm, UserCreationForm
 from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
-from .models import Category
+from .interests import InterestTag
+from .models import Attraction, Category, LocalListing, Profile
 
 
 class RegistrationForm(UserCreationForm):
@@ -12,9 +13,10 @@ class RegistrationForm(UserCreationForm):
 
     interests = forms.MultipleChoiceField(
         label="感兴趣的内容",
-        choices=Category.choices,
+        choices=InterestTag.choices,
         required=False,
         widget=forms.CheckboxSelectMultiple,
+        help_text="可多选景点、美食和文创兴趣，也可以暂时不选。",
     )
 
     class Meta(UserCreationForm.Meta):
@@ -88,3 +90,40 @@ class PlanForm(forms.Form):
     budget_minutes = forms.IntegerField(
         min_value=30, max_value=480,
     )
+
+
+class InterestTagsAdminForm(forms.ModelForm):
+    tags = forms.MultipleChoiceField(
+        label="推荐兴趣标签", choices=InterestTag.choices, required=False,
+        widget=forms.CheckboxSelectMultiple,
+        help_text="可跨类别多选；与原有分类、行程规划选项独立。",
+    )
+
+
+class AttractionAdminForm(InterestTagsAdminForm):
+    class Meta:
+        model = Attraction
+        fields = "__all__"
+
+
+class LocalListingAdminForm(InterestTagsAdminForm):
+    class Meta:
+        model = LocalListing
+        fields = "__all__"
+
+
+class ProfileAdminForm(forms.ModelForm):
+    interests = forms.MultipleChoiceField(
+        label="推荐兴趣", choices=InterestTag.choices, required=False,
+        widget=forms.CheckboxSelectMultiple,
+    )
+
+    class Meta:
+        model = Profile
+        fields = "__all__"
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Retain legacy broad food preferences without inventing specific tastes.
+        if self.instance.pk and "food" in self.instance.interests:
+            self.fields["interests"].choices = [*InterestTag.choices, ("food", "美食体验（旧版偏好）")]

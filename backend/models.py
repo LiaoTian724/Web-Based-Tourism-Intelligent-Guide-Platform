@@ -5,6 +5,8 @@ from django.core.exceptions import ValidationError
 from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
 
+from .interests import validate_interest_tags
+
 
 class Category(models.TextChoices):
     HISTORY = "history", "历史建筑"
@@ -38,6 +40,7 @@ class Attraction(models.Model):
     name = models.CharField("景点名称", max_length=120)
     name_en = models.CharField("英文名称", max_length=160, blank=True)
     category = models.CharField("分类", max_length=16, choices=Category)
+    tags = models.JSONField("推荐兴趣标签", default=list, blank=True, validators=[validate_interest_tags])
     sight_type = models.CharField("观光分类", max_length=12, choices=SightType, blank=True, default="")
     world_heritage = models.BooleanField("澳门世界遗产", default=False)
     region = models.CharField("区域", max_length=12, choices=Region, default=Region.PENINSULA)
@@ -56,6 +59,12 @@ class Attraction(models.Model):
 
 
     def clean(self):
+        super().clean()
+        # JSONField(blank=True) skips validators for empty dicts/strings.
+        try:
+            validate_interest_tags(self.tags)
+        except ValidationError as error:
+            raise ValidationError({"tags": error.messages}) from error
         if self.visit_minutes < 5:
             raise ValidationError({
                 "visit_minutes": "建议停留时间不能少于5分钟"
@@ -118,6 +127,7 @@ class FoodGroup(models.TextChoices):
 
 class LocalListing(models.Model):
     kind = models.CharField("类型", choices=ListingKind, max_length=10)
+    tags = models.JSONField("推荐兴趣标签", default=list, blank=True, validators=[validate_interest_tags])
     slug = models.SlugField(unique=True)
     name = models.CharField("名称", max_length=120)
     summary = models.CharField("简介", max_length=240)
@@ -132,6 +142,13 @@ class LocalListing(models.Model):
     longitude = models.FloatField("经度", null=True, blank=True, validators=[MinValueValidator(-180), MaxValueValidator(180)])
     enabled = models.BooleanField("公开显示", default=True)
 
+    def clean(self):
+        super().clean()
+        try:
+            validate_interest_tags(self.tags)
+        except ValidationError as error:
+            raise ValidationError({"tags": error.messages}) from error
+
     def __str__(self):
         return self.name
 
@@ -142,6 +159,42 @@ class Bookmark(models.Model):
 
     class Meta:
         constraints = [models.UniqueConstraint(fields=["user", "listing"], name="one_listing_bookmark")]
+
+
+class InteractionAction(models.TextChoices):
+    VIEW = "view", "查看详情"
+    BOOKMARK = "bookmark", "收藏"
+    UNBOOKMARK = "unbookmark", "取消收藏"
+
+
+class UserInteraction(models.Model):
+    """Observed actions only; no backfilled or simulated training events."""
+
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="interactions")
+    attraction = models.ForeignKey(Attraction, null=True, blank=True, on_delete=models.CASCADE, related_name="interactions")
+    listing = models.ForeignKey(LocalListing, null=True, blank=True, on_delete=models.CASCADE, related_name="interactions")
+    action = models.CharField("行为", max_length=12, choices=InteractionAction)
+    created_at = models.DateTimeField("发生时间", auto_now_add=True)
+    impression_id = models.UUIDField("推荐曝光编号", null=True, blank=True)
+
+    class Meta:
+        ordering = ["-created_at", "-pk"]
+        indexes = [
+            models.Index(fields=["user", "created_at"], name="interaction_user_time"),
+            models.Index(fields=["attraction", "action", "created_at"], name="interaction_attraction_action"),
+            models.Index(fields=["listing", "action", "created_at"], name="interaction_listing_action"),
+        ]
+        constraints = [
+            models.CheckConstraint(
+                condition=(models.Q(attraction__isnull=False, listing__isnull=True)
+                           | models.Q(attraction__isnull=True, listing__isnull=False)),
+                name="one_interaction_target",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(action__in=InteractionAction.values),
+                name="valid_interaction_action",
+            ),
+        ]
 
 
 class ReviewStatus(models.TextChoices):

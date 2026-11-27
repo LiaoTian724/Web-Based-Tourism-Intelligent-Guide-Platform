@@ -1,15 +1,16 @@
 from urllib.parse import urlencode
 
+from django.db import transaction
 from django.db.models import Avg, Count, Q
 from django.http import JsonResponse
 
 from django.views.decorators.csrf import ensure_csrf_cookie
 from django.views.decorators.http import require_GET, require_http_methods
 
-from .models import Bookmark, ListingKind, LocalListing, Review, ReviewStatus
+from .models import Bookmark, InteractionAction, ListingKind, LocalListing, Review, ReviewStatus, UserInteraction
+from .interests import tag_labels
 
-from django.contrib.staticfiles.storage import staticfiles_storage
-from .discovery_photos import PHOTO_CREDITS, SVG_IMAGE_KEYS
+from .discovery_photos import PHOTO_CREDITS
 
 from .image_utils import find_image
 
@@ -41,6 +42,8 @@ def listing_to_dict(item, bookmarked_ids):
         "name": item.name,
         "kind": item.kind,
         "summary": item.summary,
+        "tags": item.tags,
+        "tag_labels": tag_labels(item.tags),
         "label": item.label,
         "address": item.address,
         "price": item.price,
@@ -100,15 +103,20 @@ def listing_bookmark(request, listing_id):
     if not listing:
         return JsonResponse({"error": "内容不存在"}, status=404)
 
-    # 收藏
-    if request.method == "POST":
-        Bookmark.objects.get_or_create(user=request.user, listing=listing)
-        bookmarked = True
+    # Only actual state changes become preference signals, in the same transaction.
+    with transaction.atomic():
+        if request.method == "POST":
+            _, changed = Bookmark.objects.get_or_create(user=request.user, listing=listing)
+            bookmarked = True
+            action = InteractionAction.BOOKMARK
+        else:
+            deleted, _ = Bookmark.objects.filter(user=request.user, listing=listing).delete()
+            changed = deleted > 0
+            bookmarked = False
+            action = InteractionAction.UNBOOKMARK
 
-    # 取消收藏
-    else:
-        Bookmark.objects.filter(user=request.user, listing=listing).delete()
-        bookmarked = False
+        if changed:
+            UserInteraction.objects.create(user=request.user, listing=listing, action=action)
 
     return JsonResponse({"bookmarked": bookmarked})
 

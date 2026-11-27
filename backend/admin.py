@@ -1,5 +1,7 @@
 from django.contrib import admin
 
+from .forms import AttractionAdminForm, LocalListingAdminForm, ProfileAdminForm
+
 from .models import (
     AIItineraryDraft,
     Attraction,
@@ -12,6 +14,7 @@ from .models import (
     Profile,
     Review,
     ReviewNotification,
+    UserInteraction,
 )
 
 
@@ -22,6 +25,7 @@ admin.site.index_title = "旅游平台数据管理"
 
 @admin.register(Attraction)
 class AttractionAdmin(admin.ModelAdmin):
+    form = AttractionAdminForm
     list_display = ("name", "region", "sight_type", "world_heritage", "enabled")
     list_filter = ("region", "sight_type", "world_heritage", "category", "less_known", "enabled")
     search_fields = ("name", "name_en", "address")
@@ -31,6 +35,7 @@ class AttractionAdmin(admin.ModelAdmin):
 
 @admin.register(Profile)
 class ProfileAdmin(admin.ModelAdmin):
+    form = ProfileAdminForm
     list_display = ("user",)
     search_fields = ("user__username",)
 
@@ -51,6 +56,7 @@ class ItineraryStopAdmin(admin.ModelAdmin):
 
 @admin.register(LocalListing)
 class LocalListingAdmin(admin.ModelAdmin):
+    form = LocalListingAdminForm
     list_display = ("name", "kind", "area", "food_group", "enabled")
     list_filter = ("kind", "food_group", "area", "enabled")
     search_fields = ("name", "address", "label")
@@ -95,3 +101,18 @@ class AIItineraryDraftAdmin(admin.ModelAdmin):
     list_display = ("id", "user", "budget_minutes", "created_at")
     search_fields = ("user__username", "request_text")
     readonly_fields = ("created_at",)
+
+
+@admin.register(UserInteraction)
+class UserInteractionAdmin(admin.ModelAdmin):
+    list_display = ("user", "attraction", "listing", "action", "created_at")
+    list_filter = ("action", "created_at")
+    search_fields = ("user__username", "attraction__name", "listing__name")
+    list_select_related = ("user", "attraction", "listing")
+    readonly_fields = ("user", "attraction", "listing", "action", "created_at", "impression_id")
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False

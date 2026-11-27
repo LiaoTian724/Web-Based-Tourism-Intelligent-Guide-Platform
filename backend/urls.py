@@ -1,6 +1,6 @@
 from django.urls import path
 from django.contrib.auth.views import LoginView, LogoutView
-from . import community, views, accounts
+from . import community, views, accounts, interactions
 from .forms import LoginForm
 
 urlpatterns = [
@@ -15,6 +15,7 @@ urlpatterns = [
     path("api/listings/<int:listing_id>/bookmark/", community.listing_bookmark, name="listing-bookmark",),
 
     path("api/account/", accounts.current_account, name="account"),
+    path("api/interactions/", interactions.user_interaction, name="user-interaction"),
 
     path("accounts/register/", accounts.register, name="register"),
     path("accounts/login/",
