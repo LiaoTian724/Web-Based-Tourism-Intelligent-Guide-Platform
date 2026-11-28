@@ -88,8 +88,6 @@ function googleMapsUrl(place) {
     return `https://www.google.com/maps/search/?api=1&query=${place.lat},${place.lng}`
 }
 
-
-
 function buildAttractionParams() {
     const params = new URLSearchParams()
 
@@ -101,7 +99,6 @@ function buildAttractionParams() {
 
     return params
 }
-
 
 // 根据最后一次成功查询生成导出地址
 const exportUrl = computed(() => {
@@ -116,7 +113,6 @@ const exportUrl = computed(() => {
         : '/api/attractions/export/'
 })
 
-
 // 获取完整景点目录，不使用任何筛选条件
 async function loadAllAttractions() {
     try {
@@ -129,7 +125,6 @@ async function loadAllAttractions() {
         console.error('获取完整景点目录失败:', err)
     }
 }
-
 
 // 从 Django 获取景点
 async function loadAttractions() {
@@ -164,7 +159,6 @@ async function loadAttractions() {
     }
 }
 
-
 // 重置筛选
 function resetFilters() {
     keyword.value = ''
@@ -174,7 +168,6 @@ function resetFilters() {
     lessKnownOnly.value = false
     loadAttractions()
 }
-
 
 // 获取当前登录用户
 async function loadAccount() {
@@ -194,8 +187,6 @@ async function loadAccount() {
     return account.value
 }
 
-
-
 // 页面加载后获取数据
 onMounted(() => {
     loadAllAttractions()
@@ -203,221 +194,178 @@ onMounted(() => {
     accountReady.value = loadAccount()
 })
 
-
-
 </script>
 
 <template>
-    <div class="page">
-        <header class="header">
+    <el-container direction="vertical">
+        <el-header class="site-header" height="auto">
             <div class="brand">
-                <div class="brand-icon">澳</div>
-
-                <div>
-                    <h2>澳門漫遊</h2>
-                    <span>MACAO CULTURAL GUIDE</span>
-                </div>
+                <span class="brand-icon">澳</span>
+                <div><h2>澳門漫遊</h2><small>MACAO CULTURAL GUIDE</small></div>
             </div>
-
-            <nav class="main-nav">
-                <button :class="{ active: activePage === 'attractions' }"
-                    @click="activePage = 'attractions'">景点探索</button>
-                <button :class="{ active: activePage === 'discovery' }" @click="activePage = 'discovery'">美食与文创</button>
-                <button :class="{ active: activePage === 'bookmarks' }" @click="activePage = 'bookmarks'">我的收藏</button>
-                <button :class="{ active: activePage === 'planner' }" @click="activePage = 'planner'">行程规划</button>
-            </nav>
-
-            <!-- 用户登录状态, 就是检查是否登录 -->
-            <div class="header-account">
-                <span v-if="accountError">登录状态获取失败</span>
+            <el-menu :default-active="activePage" mode="horizontal" :ellipsis="false" class="site-nav"
+                @select="activePage = $event">
+                <el-menu-item index="attractions">景点探索</el-menu-item>
+                <el-menu-item index="discovery">美食与文创</el-menu-item>
+                <el-menu-item index="bookmarks">我的收藏</el-menu-item>
+                <el-menu-item index="planner">行程规划</el-menu-item>
+            </el-menu>
+            <el-space wrap>
+                <el-text v-if="accountError" type="danger">登录状态获取失败</el-text>
                 <template v-else-if="account?.authenticated">
                     <span>你好，{{ account.account }}</span>
-
-                    <a v-if="account.staff" href="http://127.0.0.1:8008/admin/" target="_blank"
-                        rel="noopener noreferrer">管理后台</a>
-
+                    <el-link v-if="account.staff" href="http://127.0.0.1:8008/admin/" target="_blank"
+                        rel="noopener noreferrer">管理后台</el-link>
                     <form method="post" action="/accounts/logout/">
                         <input type="hidden" name="csrfmiddlewaretoken" :value="csrfToken">
-                        <button type="submit">退出登录</button>
+                        <el-button native-type="submit">退出登录</el-button>
                     </form>
                 </template>
-
                 <template v-else-if="account">
-                    <a href="/accounts/login/?next=/">登录</a>
-                    <a href="/accounts/register/?next=/">注册</a>
+                    <el-link href="/accounts/login/?next=/">登录</el-link>
+                    <el-link href="/accounts/register/?next=/">注册</el-link>
                 </template>
+                <el-text v-else type="info">正在检查登录状态...</el-text>
+            </el-space>
+        </el-header>
 
-                <span v-else>正在检查登录状态...</span>
-            </div>
-
-        </header>
-
-        <main class="container">
+        <el-main class="site-main">
             <section class="hero">
                 <p class="eyebrow">DISCOVER MACAO</p>
                 <h1 v-if="activePage === 'attractions'">在澳门，发现城市的另一面。</h1>
-                <h1 v-else-if="activePage === 'discovery'"> 从街头味道到澳门手信。 </h1>
-                <h1 v-else-if="activePage === 'planner'"> 规划属于你的澳门漫步。 </h1>
+                <h1 v-else-if="activePage === 'discovery'">从街头味道到澳门手信。</h1>
+                <h1 v-else-if="activePage === 'planner'">规划属于你的澳门漫步。</h1>
                 <h1 v-else>收藏你的澳门记忆。</h1>
-
                 <p v-if="activePage === 'attractions'">从世界文化遗产到城市街巷，探索澳门独特的历史、文化与生活。</p>
                 <p v-else-if="activePage === 'discovery'">从街头美食到特色手信，发现澳门独特的本地生活与城市风味。</p>
                 <p v-else-if="activePage === 'planner'">根据你的兴趣与时间预算，生成个性化的澳门步行行程。</p>
                 <p v-else>查看和管理你收藏的景点、美食与澳门手信。</p>
             </section>
 
-            <!-- 搜索和筛选 -->
             <template v-if="activePage === 'attractions'">
-                <section class="search-panel">
-                    <form @submit.prevent="loadAttractions">
-                        <label><span>搜索景点</span>
-                            <el-input v-model="keyword" type="search" placeholder="输入景点名称、英文名称或地址" clearable />
-                        </label>
-
-                        <label>
-                            <span>选择区域</span>
-                            <el-select v-model="region">
-                                <el-option v-for="item in regions" :key="item.value" :label="item.label"
-                                    :value="item.value" />
-                            </el-select>
-                        </label>
-
-                        <label>
-                            <span>选择分类</span>
-                            <el-select v-model="category">
-                                <el-option v-for="item in categories" :key="item.value" :label="item.label"
-                                    :value="item.value" />
-                            </el-select>
-                        </label>
-
-                        <label>
-                            <span>选择观光主题</span>
-                            <el-select v-model="theme">
-                                <el-option v-for="item in themes" :key="item.value" :label="item.label"
-                                    :value="item.value" />
-                            </el-select>
-                        </label>
-
-                        <div class="actions">
-                            <el-checkbox v-model="lessKnownOnly" class="checkbox-filter">只看小众景点</el-checkbox>
+                <el-card shadow="never">
+                    <el-form label-position="top" @submit.prevent="loadAttractions">
+                        <el-row :gutter="16">
+                            <el-col :xs="24" :sm="12" :lg="8">
+                                <el-form-item label="搜索景点">
+                                    <el-input v-model="keyword" type="search" placeholder="输入景点名称、英文名称或地址" clearable />
+                                </el-form-item>
+                            </el-col>
+                            <el-col :xs="24" :sm="12" :lg="6">
+                                <el-form-item label="选择区域">
+                                    <el-select v-model="region" :empty-values="[null, undefined]">
+                                        <el-option v-for="item in regions" :key="item.value" :label="item.label" :value="item.value" />
+                                    </el-select>
+                                </el-form-item>
+                            </el-col>
+                            <el-col :xs="24" :sm="12" :lg="5">
+                                <el-form-item label="选择分类">
+                                    <el-select v-model="category" :empty-values="[null, undefined]">
+                                        <el-option v-for="item in categories" :key="item.value" :label="item.label" :value="item.value" />
+                                    </el-select>
+                                </el-form-item>
+                            </el-col>
+                            <el-col :xs="24" :sm="12" :lg="5">
+                                <el-form-item label="选择观光主题">
+                                    <el-select v-model="theme" :empty-values="[null, undefined]">
+                                        <el-option v-for="item in themes" :key="item.value" :label="item.label" :value="item.value" />
+                                    </el-select>
+                                </el-form-item>
+                            </el-col>
+                        </el-row>
+                        <el-space wrap>
+                            <el-checkbox v-model="lessKnownOnly">只看小众景点</el-checkbox>
                             <el-button type="primary" native-type="submit" :loading="loading">搜索</el-button>
-                            <el-button native-type="button" :disabled="loading" @click="resetFilters">重置</el-button>
-                        </div>
-                    </form>
+                            <el-button :disabled="loading" @click="resetFilters">重置</el-button>
+                        </el-space>
+                    </el-form>
+                </el-card>
 
-                </section>
-
-                <!-- 澳门地图 -->
-                <section class="map-section">
-                    <div class="section-title">
-                        <div>
-                            <p>MACAO MAP</p>
-                            <h2>地图探索</h2>
-                        </div>
-
-                        <span>点击地图标记查看景点</span>
+                <section class="page-section">
+                    <div class="section-heading">
+                        <div><p class="eyebrow">MACAO MAP</p><h2>地图探索</h2></div>
+                        <el-text type="info">点击地图标记查看景点</el-text>
                     </div>
-
                     <AttractionMap :places="attractions" :selected-id="selectedId" @select="selectAttraction" />
-
-                    <!-- 当前选中的景点 -->
-                    <div v-if="selectedPlace" class="selected-place">
-                        <div>
-                            <strong>{{ selectedPlace.name }}</strong>
-                            <p>{{ selectedPlace.address }}</p>
-                        </div>
-
-                        <div class="selected-actions">
-                            <a :href="googleMapsUrl(selectedPlace)" target="_blank" rel="noopener noreferrer">Google
-                                Maps 导航 ↗</a>
-                            <button type="button" class="reset" @click="selectedId = null">取消选择</button>
-                        </div>
-                    </div>
-
+                    <el-card v-if="selectedPlace" shadow="never" class="section-gap">
+                        <strong>{{ selectedPlace.name }}</strong>
+                        <p>{{ selectedPlace.address }}</p>
+                        <el-space wrap>
+                            <el-link :href="googleMapsUrl(selectedPlace)" target="_blank" rel="noopener noreferrer">Google Maps 导航 ↗</el-link>
+                            <el-button @click="selectedId = null">取消选择</el-button>
+                        </el-space>
+                    </el-card>
                 </section>
 
-                <!-- 景点列表 -->
-                <section class="results">
-                    <div class="section-title">
-                        <div>
-                            <p>THE ATTRACTIONS</p>
-                            <h2>探索景点</h2>
-                        </div>
-
-                        <div class="results-actions">
-                            <span>{{ attractions.length }} 个景点</span>
-                            <a v-if="exportUrl && !loading && !error" :href="exportUrl" class="export-link">导出当前结果 ↓</a>
-                        </div>
+                <section class="page-section">
+                    <div class="section-heading">
+                        <div><p class="eyebrow">THE ATTRACTIONS</p><h2>探索景点</h2></div>
+                        <el-space wrap>
+                            <el-text type="info">{{ attractions.length }} 个景点</el-text>
+                            <el-link v-if="exportUrl && !loading && !error" :href="exportUrl" type="primary">导出当前结果 ↓</el-link>
+                        </el-space>
                     </div>
-
-                    <div v-if="loading" class="message">正在加载景点...</div>
-                    <div v-else-if="error" class="message error">{{ error }}</div>
-                    <div v-else-if="attractions.length" class="card-grid">
-                        <article v-for="place in attractions" :key="place.id"
-                            :class="['place-card', { selected: selectedId === place.id }]">
-                            <img v-if="place.image_url" :src="place.image_url" :alt="place.name" class="place-image"
-                                loading="lazy">
-                            <div class="card-tags">
-                                <span class="category">{{ place.category_label }}</span>
-                                <span>{{ place.region_label }}</span>
-                            </div>
-
-                            <h3>{{ place.name }}</h3>
-
-                            <p v-if="place.name_en" class="english">{{ place.name_en }}</p>
-                            <p class="summary">{{ place.summary }}</p>
-
-                            <div class="details">
-                                <p><span>地址</span>{{ place.address }}</p>
-                                <p><span>开放时间</span>{{ place.hours }}</p>
-                                <p><span>门票</span>{{ place.admission }}</p>
-                            </div>
-
-                            <div class="card-footer">
-                                <span>{{ place.visit_minutes }} 分钟</span>
-                                <span v-for="topic in place.sight_topics" :key="topic.id">
-                                    {{ topic.name }}
-                                </span>
-                                <span v-if="place.less_known">小众景点</span>
-                                <button type="button" class="map-select"
-                                    @click="openAttractionDetails(place)">查看详情</button>
-                                <button type="button" class="map-select"
-                                    @click="selectAttraction(place.id)">地图定位</button>
-                            </div>
-                        </article>
+                    <el-alert v-if="error" :title="error" type="error" :closable="false" show-icon />
+                    <div v-loading="loading" element-loading-text="正在加载景点..." class="loading-region">
+                        <el-row v-if="!error && attractions.length" :gutter="20" class="card-row">
+                            <el-col v-for="place in attractions" :key="place.id" :xs="24" :sm="12" :lg="8">
+                                <el-card shadow="hover" :class="['content-card', { 'is-selected': selectedId === place.id }]">
+                                    <el-image v-if="place.image_url" :src="place.image_url" :alt="place.name" fit="cover" loading="lazy" class="card-image" />
+                                    <el-space wrap>
+                                        <el-tag>{{ place.category_label }}</el-tag>
+                                        <el-tag type="info">{{ place.region_label }}</el-tag>
+                                    </el-space>
+                                    <h3>{{ place.name }}</h3>
+                                    <el-text v-if="place.name_en" type="info" size="small">{{ place.name_en }}</el-text>
+                                    <p class="summary">{{ place.summary }}</p>
+                                    <el-descriptions :column="1" size="small">
+                                        <el-descriptions-item label="地址">{{ place.address }}</el-descriptions-item>
+                                        <el-descriptions-item label="开放时间">{{ place.hours }}</el-descriptions-item>
+                                        <el-descriptions-item label="门票">{{ place.admission }}</el-descriptions-item>
+                                    </el-descriptions>
+                                    <el-space wrap>
+                                        <el-tag type="info" size="small">{{ place.visit_minutes }} 分钟</el-tag>
+                                        <el-tag v-for="topic in place.sight_topics" :key="topic.id" type="info" size="small">{{ topic.name }}</el-tag>
+                                        <el-tag v-if="place.less_known" type="warning" size="small">小众景点</el-tag>
+                                    </el-space>
+                                    <el-space wrap class="section-gap">
+                                        <el-button type="primary" @click="openAttractionDetails(place)">查看详情</el-button>
+                                        <el-button @click="selectAttraction(place.id)">地图定位</el-button>
+                                    </el-space>
+                                </el-card>
+                            </el-col>
+                        </el-row>
+                        <el-empty v-else-if="!loading && !error" description="暂时没有找到景点，请调整搜索条件。" />
                     </div>
-
-                    <div v-else class="message">暂时没有找到景点，请调整搜索条件。</div>
                 </section>
             </template>
-
-            <LocalListings v-else-if="activePage === 'discovery'" :attractions="allAttractions" :account="account"
-                :account-ready="accountReady" />
+            <LocalListings v-else-if="activePage === 'discovery'" :attractions="allAttractions" :account="account" :account-ready="accountReady" />
             <ItineraryPlanner v-else-if="activePage === 'planner'" :categories="categories" :account="account" />
             <MyBookmarks v-else />
-        </main>
+        </el-main>
 
         <el-dialog v-model="detailVisible" :title="detailPlace?.name" width="min(640px, 92vw)">
             <template v-if="detailPlace">
-                <img v-if="detailPlace.image_url" :src="detailPlace.image_url" :alt="detailPlace.name"
-                    class="place-image">
-                <p v-if="detailPlace.name_en" class="english">{{ detailPlace.name_en }}</p>
+                <el-image v-if="detailPlace.image_url" :src="detailPlace.image_url" :alt="detailPlace.name" fit="cover" class="detail-image" />
+                <p v-if="detailPlace.name_en"><el-text type="info">{{ detailPlace.name_en }}</el-text></p>
                 <p>{{ detailPlace.summary }}</p>
                 <p v-if="detailPlace.history">{{ detailPlace.history }}</p>
-                <p v-if="detailPlace.tag_labels?.length">特色：{{ detailPlace.tag_labels.join(' · ') }}</p>
-                <div class="details">
-                    <p><span>地址</span>{{ detailPlace.address }}</p>
-                    <p><span>开放时间</span>{{ detailPlace.hours }}</p>
-                    <p><span>门票</span>{{ detailPlace.admission }}</p>
-                    <p><span>建议停留</span>{{ detailPlace.visit_minutes }} 分钟</p>
-                </div>
-                <p v-if="detailPlace.source_url">
-                    <a :href="detailPlace.source_url" target="_blank" rel="noopener noreferrer">查看资料来源 ↗</a>
-                </p>
-                <a :href="googleMapsUrl(detailPlace)" target="_blank" rel="noopener noreferrer">Google Maps 导航 ↗</a>
+                <el-space wrap>
+                    <el-tag v-for="tag in detailPlace.tag_labels" :key="tag">{{ tag }}</el-tag>
+                </el-space>
+                <el-divider />
+                <el-descriptions :column="1">
+                    <el-descriptions-item label="地址">{{ detailPlace.address }}</el-descriptions-item>
+                    <el-descriptions-item label="开放时间">{{ detailPlace.hours }}</el-descriptions-item>
+                    <el-descriptions-item label="门票">{{ detailPlace.admission }}</el-descriptions-item>
+                    <el-descriptions-item label="建议停留">{{ detailPlace.visit_minutes }} 分钟</el-descriptions-item>
+                </el-descriptions>
+                <el-space wrap>
+                    <el-link v-if="detailPlace.source_url" :href="detailPlace.source_url" target="_blank" rel="noopener noreferrer">查看资料来源 ↗</el-link>
+                    <el-link :href="googleMapsUrl(detailPlace)" target="_blank" rel="noopener noreferrer">Google Maps 导航 ↗</el-link>
+                </el-space>
             </template>
         </el-dialog>
-
-        <footer>澳門漫遊 · MACAO CULTURAL GUIDE</footer>
-    </div>
+        <el-footer class="site-footer">澳門漫遊 · MACAO CULTURAL GUIDE</el-footer>
+    </el-container>
 </template>

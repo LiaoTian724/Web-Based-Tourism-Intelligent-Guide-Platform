@@ -17,10 +17,6 @@ const markers = new Map()
 
 // 创建景点弹窗
 function createPopup(place) {
-    // <div>
-    //     <strong>大三巴牌坊</strong>
-    //     <p>澳门大三巴街</p>
-    // </div>  
     const box = document.createElement('div')
 
     const name = document.createElement('strong')
@@ -32,8 +28,6 @@ function createPopup(place) {
     box.append(name, address)
     return box
 }
-
-
 
 // 更新地图标记
 function renderMarkers() {
@@ -82,8 +76,6 @@ function renderMarkers() {
     }
 }
 
-
-
 // 定位选中的景点
 function focusSelected() {
     if (!map || props.selectedId === null) return
@@ -111,7 +103,6 @@ onMounted(() => {
     focusSelected()
 })
 
-
 // 景点数据发生变化时更新标记
 watch(
     () => props.places,
@@ -136,60 +127,9 @@ onUnmounted(() => {
 })
 </script>
 
-
 <template>
-    <section class="map-card">
+    <el-card shadow="never">
         <div ref="mapElement" class="map-canvas"></div>
-
-        <p class="map-help">点击地图标记查看景点，也可以从景点卡片定位。</p>
-
-    </section>
+        <p class="muted">点击地图标记查看景点，也可以从景点卡片定位。</p>
+    </el-card>
 </template>
-
-
-
-<style scoped>
-.map-card {
-    width: 100%;
-    overflow: hidden;
-    border-radius: 14px;
-    border: 1px solid #e9e6df;
-    background: white;
-}
-
-.map-canvas {
-    width: 100%;
-    height: 430px;
-    background: #e8eeeb;
-}
-
-.map-help {
-    padding: 12px 16px;
-    color: #78847c;
-    font-size: 12px;
-}
-
-:deep(.leaflet-container) {
-    width: 100%;
-    height: 100%;
-    font-family: inherit;
-}
-
-:deep(.attraction-pin) {
-    background: transparent;
-    border: none;
-}
-
-:deep(.attraction-pin span) {
-    display: grid;
-    place-items: center;
-    width: 32px;
-    height: 32px;
-    border-radius: 50%;
-    background: #315d4b;
-    border: 2px solid white;
-    color: white;
-    font-weight: bold;
-    box-shadow: 0 2px 5px #0003;
-}
-</style>

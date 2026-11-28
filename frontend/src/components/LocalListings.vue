@@ -1,9 +1,7 @@
 <script setup>
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { recordDetailView } from '../utils/interactions.js'
 
-/* <LocalListings v-else-if="activePage === 'discovery'" :attractions="attractions" :account="account"/> */
-// 看 App.vue  这里接受 :attractions 和 :account
 const props = defineProps({
     attractions: { type: Array, default: () => [] },
     account: { type: Object, default: null },
@@ -24,20 +22,20 @@ const foodGroup = ref('')
 const sort = ref('distance')
 const referenceId = ref('')
 const selectedItem = ref(null)
+let reviewController = null
 const detailsVisible = computed({
     get() {
         return selectedItem.value !== null
     },
 
     set(visible) {
-        if (!visible) {
+        if (!visible && !reviewSubmitting.value) {
+            reviewController?.abort()
             selectedItem.value = null
+            reviewLoading.value = false
         }
     }
 })
-
-// 用户登录状态
-// const account = ref({ authenticated: false })
 
 // 收藏操作状态
 const bookmarkLoadingId = ref(null)
@@ -53,8 +51,6 @@ const reviewLoading = ref(false)
 const reviewSubmitting = ref(false)
 const reviewError = ref('')
 const reviewMessage = ref('')
-
-
 
 // 获取美食和文创  GET
 async function loadListings() {
@@ -76,8 +72,6 @@ async function loadListings() {
     }
 }
 
-
-
 // Only this user-triggered entry records a detail view.
 function openDetails(item) {
     void recordDetailView({
@@ -90,21 +84,29 @@ function openDetails(item) {
 
 // 加载评价；提交评价后的自动刷新不新增浏览记录。
 async function refreshDetails(item) {
+    // 取消上次加载，旧响应和 finally 都不能覆盖新商户的评价状态。
+    reviewController?.abort()
+    const controller = new AbortController()
+    reviewController = controller
     selectedItem.value = item
     reviews.value = []
     myReview.value = null
+    reviewLoggedIn.value = false
+    reviewRating.value = 5
+    reviewBody.value = ''
     reviewError.value = ''
     reviewMessage.value = ''
     reviewLoading.value = true
 
     try {
         const response = await fetch(`/api/listings/${item.id}/reviews/`, {
-            method: 'GET'
+            signal: controller.signal
         })
 
         if (!response.ok) { throw new Error(`HTTP ${response.status}`) }
         const data = await response.json()
 
+        if (controller.signal.aborted) return
         reviews.value = data.items
         myReview.value = data.my_review
         reviewLoggedIn.value = data.authenticated
@@ -112,13 +114,11 @@ async function refreshDetails(item) {
         reviewRating.value = myReview.value?.rating || 5
         reviewBody.value = myReview.value?.body || ''
     } catch (err) {
-        reviewError.value = err.message
+        if (!controller.signal.aborted) reviewError.value = err.message
     } finally {
-        reviewLoading.value = false
+        if (!controller.signal.aborted) reviewLoading.value = false
     }
 }
-
-
 
 // 提交评价  POST
 async function submitReview() {
@@ -137,13 +137,14 @@ async function submitReview() {
     reviewError.value = ''
     reviewMessage.value = ''
 
+    const item = selectedItem.value
     const form = new FormData()
 
     form.set('rating', reviewRating.value)
     form.set('body', reviewBody.value)
 
     try {
-        const response = await fetch(`/api/listings/${selectedItem.value.id}/reviews/`, {
+        const response = await fetch(`/api/listings/${item.id}/reviews/`, {
             method: 'POST',
             headers: { 'X-CSRFToken': getCsrfToken() }, body: form
         })
@@ -151,7 +152,6 @@ async function submitReview() {
         const data = await response.json()
         if (!response.ok) { throw new Error(data.error || '提交失败') }
 
-        const item = selectedItem.value
         await refreshDetails(item)
         reviewMessage.value = data.message
         await loadListings()
@@ -162,21 +162,11 @@ async function submitReview() {
     }
 }
 
-
-
 // 获取 CSRF Token
 function getCsrfToken() {
     const cookie = document.cookie.split('; ').find(item => item.startsWith('csrftoken='))
-    // 原来的字符串：sessionid=abc123; csrftoken=xyz789; theme=dark 变成
-    // [
-    //     'sessionid=abc123',
-    //     'csrftoken=xyz789',
-    //     'theme=dark'
-    // ]
     return cookie ? cookie.split('=')[1] : ''
 }
-
-
 
 // 收藏或取消收藏   DELETE POST
 async function toggleBookmark(item) {
@@ -186,6 +176,7 @@ async function toggleBookmark(item) {
         return
     }
 
+    if (bookmarkLoadingId.value !== null) return
     bookmarkLoadingId.value = item.id
     actionError.value = ''
 
@@ -206,14 +197,9 @@ async function toggleBookmark(item) {
 
         const data = await response.json()
 
-        // 更新收藏状态
-        const newItems = []
-        for (const listing of items.value) {
-            if (listing.id === item.id) {
-                newItems.push({ ...listing, bookmarked: data.bookmarked })
-            } else { newItems.push(listing) }
-        }
-        items.value = newItems
+        items.value = items.value.map(listing =>
+            listing.id === item.id ? { ...listing, bookmarked: data.bookmarked } : listing
+        )
 
     } catch (err) {
         actionError.value = err.message || '收藏操作失败'
@@ -221,8 +207,6 @@ async function toggleBookmark(item) {
         bookmarkLoadingId.value = null
     }
 }
-
-
 
 // 根据当前分类筛选
 const currentItems = computed(() => {
@@ -243,7 +227,6 @@ const foodGroups = computed(() => {
             .map(item => [item.food_group, item.food_group_label])
     )]
 })
-
 
 // 获取参考景点
 const referencePlace = computed(() => {
@@ -306,7 +289,6 @@ const visibleItems = computed(() => {
     return results
 })
 
-
 // 切换分类时重置筛选
 watch(kind, () => {
     keyword.value = ''
@@ -314,9 +296,8 @@ watch(kind, () => {
     label.value = ''
     foodGroup.value = ''
     sort.value = kind.value === 'food' ? 'distance' : 'rating'
-    selectedItem.value = null
+    detailsVisible.value = false
 })
-
 
 // 清空筛选  全部改为 ""
 function resetFilters() {
@@ -326,215 +307,164 @@ function resetFilters() {
     foodGroup.value = ''
 }
 
-
-
 // 页面初始化
-onMounted(async () => {
-    // await loadAccount()
-    await loadListings()
-})
+onMounted(loadListings)
+onUnmounted(() => reviewController?.abort())
 </script>
 
 <template>
-    <section class="discovery-page">
-
-        <!-- 页面标题 -->
-        <div class="discovery-heading">
+    <section>
+        <div class="section-heading">
             <div>
-                <p class="discovery-eyebrow">MACAO DISCOVERY</p>
+                <p class="eyebrow">MACAO DISCOVERY</p>
                 <h2>{{ kind === 'food' ? '澳门地道美食' : '文创与手信' }}</h2>
-
                 <p>{{ kind === 'food' ? '从街坊小吃到葡国料理，探索澳门的味道。' : '发现澳门文化与历史建筑衍生的特色文创。' }}</p>
             </div>
-
-            <div class="discovery-tabs">
-                <button :class="{ active: kind === 'food' }" @click="kind = 'food'">地道美食</button>
-                <button :class="{ active: kind === 'product' }" @click="kind = 'product'">文创手信</button>
-            </div>
+            <el-radio-group v-model="kind" aria-label="内容分类">
+                <el-radio-button value="food">地道美食</el-radio-button>
+                <el-radio-button value="product">文创手信</el-radio-button>
+            </el-radio-group>
         </div>
 
-        <!-- 筛选区域 -->
-        <div class="discovery-filter">
-            <el-input v-model="keyword" placeholder="搜索名称、类型或地址..." clearable />
-
-            <el-select v-model="area" :empty-values="[null, undefined]">
-                <el-option label="全部区域" value="" />
-                <el-option v-for="[id, name] in areas" :key="id" :label="name" :value="id" />
-            </el-select>
-
-            <el-select v-model="label" :empty-values="[null, undefined]">
-                <el-option label="全部类别" value="" />
-                <el-option v-for="item in labels" :key="item" :label="item" :value="item" />
-            </el-select>
-
-            <el-select v-if="kind === 'food'" v-model="foodGroup" :empty-values="[null, undefined]">
-                <el-option label="全部美食主题" value="" />
-                <el-option v-for="[id, name] in foodGroups" :key="id" :label="name" :value="id" />
-            </el-select>
-
-            <el-select v-model="sort">
-                <el-option v-if="kind === 'food'" label="距离优先" value="distance" />
-                <el-option label="评分优先" value="rating" />
-            </el-select>
-
-            <el-select v-if="kind === 'food' && attractions.length" v-model="referenceId"
-                :empty-values="[null, undefined]" filterable>
-                <el-option label="默认参考景点" value="" />
-                <el-option v-for="place in attractions" :key="place.id" :label="place.name" :value="String(place.id)" />
-            </el-select>
-
-            <el-button @click="resetFilters">
-                重置筛选
-            </el-button>
+        <el-card shadow="never">
+            <el-form label-position="top" @submit.prevent>
+                <el-row :gutter="16">
+                    <el-col :xs="24" :sm="12" :lg="8">
+                        <el-form-item label="搜索商户">
+                            <el-input v-model="keyword" placeholder="搜索名称、类型或地址..." clearable />
+                        </el-form-item>
+                    </el-col>
+                    <el-col :xs="24" :sm="12" :lg="8">
+                        <el-form-item label="区域">
+                            <el-select v-model="area" :empty-values="[null, undefined]">
+                                <el-option label="全部区域" value="" />
+                                <el-option v-for="[id, name] in areas" :key="id" :label="name" :value="id" />
+                            </el-select>
+                        </el-form-item>
+                    </el-col>
+                    <el-col :xs="24" :sm="12" :lg="8">
+                        <el-form-item label="类别">
+                            <el-select v-model="label" :empty-values="[null, undefined]">
+                                <el-option label="全部类别" value="" />
+                                <el-option v-for="item in labels" :key="item" :label="item" :value="item" />
+                            </el-select>
+                        </el-form-item>
+                    </el-col>
+                    <el-col v-if="kind === 'food'" :xs="24" :sm="12" :lg="8">
+                        <el-form-item label="美食主题">
+                            <el-select v-model="foodGroup" :empty-values="[null, undefined]">
+                                <el-option label="全部美食主题" value="" />
+                                <el-option v-for="[id, name] in foodGroups" :key="id" :label="name" :value="id" />
+                            </el-select>
+                        </el-form-item>
+                    </el-col>
+                    <el-col :xs="24" :sm="12" :lg="8">
+                        <el-form-item label="排序方式">
+                            <el-select v-model="sort">
+                                <el-option v-if="kind === 'food'" label="距离优先" value="distance" />
+                                <el-option label="评分优先" value="rating" />
+                            </el-select>
+                        </el-form-item>
+                    </el-col>
+                    <el-col v-if="kind === 'food' && attractions.length" :xs="24" :sm="12" :lg="8">
+                        <el-form-item label="距离参考景点">
+                            <el-select v-model="referenceId" :empty-values="[null, undefined]" filterable>
+                                <el-option label="默认参考景点" value="" />
+                                <el-option v-for="place in attractions" :key="place.id" :label="place.name" :value="String(place.id)" />
+                            </el-select>
+                        </el-form-item>
+                    </el-col>
+                </el-row>
+                <el-button @click="resetFilters">重置筛选</el-button>
+            </el-form>
+        </el-card>
+        <p><el-text type="info">找到 {{ visibleItems.length }} 项内容</el-text></p>
+        <el-alert v-if="error" :title="error" type="error" :closable="false" show-icon>
+            <el-button @click="loadListings">重试</el-button>
+        </el-alert>
+        <el-alert v-if="actionError" :title="actionError" type="error" :closable="false" show-icon />
+        <div v-loading="loading" element-loading-text="正在加载..." class="loading-region">
+            <template v-if="!error">
+                <el-row :gutter="20" class="card-row">
+                    <el-col v-for="item in visibleItems" :key="item.id" :xs="24" :sm="12" :lg="8">
+                        <el-card shadow="hover" class="content-card">
+                            <el-image :src="item.image_url || ''" :alt="item.name" fit="cover" loading="lazy" class="card-image">
+                                <template #error><div class="image-placeholder">澳门漫遊</div></template>
+                            </el-image>
+                            <el-space wrap>
+                                <el-tag type="info">{{ item.area_label }}</el-tag>
+                                <el-tag>{{ item.food_group_label || item.label }}</el-tag>
+                            </el-space>
+                            <h3>{{ item.name }}</h3>
+                            <p class="summary">{{ item.summary }}</p>
+                            <el-space wrap>
+                                <el-text type="warning">{{ item.rating != null ? `★ ${Number(item.rating).toFixed(1)}` : '暂无评价' }}</el-text>
+                                <el-text v-if="item.distance != null" type="info">{{ distanceText(item.distance) }}</el-text>
+                                <el-text v-if="item.price" type="info">{{ item.price }}</el-text>
+                            </el-space>
+                            <el-space wrap class="section-gap">
+                                <el-button :type="item.bookmarked ? 'success' : 'default'" :loading="bookmarkLoadingId === item.id"
+                                    :disabled="bookmarkLoadingId !== null" @click="toggleBookmark(item)">
+                                    {{ item.bookmarked ? '已收藏' : '收藏' }}
+                                </el-button>
+                                <el-button type="primary" @click="openDetails(item)">查看详情</el-button>
+                            </el-space>
+                        </el-card>
+                    </el-col>
+                </el-row>
+                <el-empty v-if="!loading && !visibleItems.length" description="没有找到符合条件的内容。" />
+            </template>
         </div>
 
-        <!-- 数据状态 -->
-        <p v-if="loading" class="discovery-message">正在加载...</p>
-
-        <p v-else-if="error" class="discovery-message error">{{ error }}<button @click="loadListings">重试</button></p>
-
-        <p v-else class="discovery-count">找到 {{ visibleItems.length }} 项内容</p>
-        <p v-if="actionError" class="discovery-message error"> {{ actionError }} </p>
-
-        <!-- 数据卡片 -->
-        <div v-if="!loading && !error" class="discovery-grid">
-            <article v-for="item in visibleItems" :key="item.id" class="discovery-card">
-                <div class="discovery-image">
-                    <img v-if="item.image_url" :src="item.image_url" :alt="item.name" loading="lazy">
-                    <div v-else class="image-placeholder">澳门漫遊</div>
-
-                    <span class="discovery-area">{{ item.area_label }}</span>
-                </div>
-
-                <div class="discovery-card-body">
-                    <p class="discovery-label">{{ item.food_group_label || item.label }}</p>
-
-                    <h3>{{ item.name }}</h3>
-
-                    <p class="discovery-summary">{{ item.summary }}</p>
-
-                    <div class="discovery-meta">
-                        <span>
-                            {{ item.rating != null ? `★ ${Number(item.rating).toFixed(1)}` : '暂无评价' }}
-                        </span>
-
-                        <span v-if="item.distance != null">{{ distanceText(item.distance) }}</span>
-
-                        <span v-if="item.price">{{ item.price }}</span>
-                    </div>
-
-                    <!-- 收藏按钮 -->
-                    <button class="bookmark-button" :class="{ saved: item.bookmarked }"
-                        :disabled="bookmarkLoadingId === item.id" @click="toggleBookmark(item)">
-                        {{ bookmarkLoadingId === item.id ? '处理中...' : item.bookmarked ? '已收藏' : '收藏' }}
-                    </button>
-
-                    <!-- 查看详情 -->
-                    <button class="discovery-detail-button" @click="openDetails(item)"> 查看详情 </button>
-                </div>
-            </article>
-
-        </div>
-
-        <div v-if="!loading && !error && !visibleItems.length" class="discovery-message">没有找到符合条件的内容。</div>
-
-        <!-- 详情弹窗 -->
         <el-dialog v-model="detailsVisible" :title="selectedItem?.name || '详情'" width="min(650px, 92vw)"
-            :close-on-click-modal="!reviewSubmitting" :close-on-press-escape="!reviewSubmitting"
-            :show-close="!reviewSubmitting" append-to-body>
+            :close-on-click-modal="!reviewSubmitting" :close-on-press-escape="!reviewSubmitting" :show-close="!reviewSubmitting">
             <template v-if="selectedItem">
-
-                <img v-if="selectedItem.image_url" :src="selectedItem.image_url" :alt="selectedItem.name"
-                    class="listing-detail-image">
-
-                <div class="discovery-modal-body">
-                    <p class="discovery-label">{{ selectedItem.area_label }}</p>
-
-                    <p>{{ selectedItem.summary }}</p>
-                    <p v-if="selectedItem.tag_labels?.length">特色：{{ selectedItem.tag_labels.join(' · ') }}</p>
-
-                    <p v-if="selectedItem.address">地址：{{ selectedItem.address }}</p>
-                    <p v-if="selectedItem.price">参考价格：{{ selectedItem.price }}</p>
-                    <div v-if="selectedItem.image_credit" class="discovery-credit">
-                        图片来源：
-                        <a :href="selectedItem.image_credit.source_url" target="_blank" rel="noopener noreferrer">
-                            {{ selectedItem.image_credit.author }}
-                        </a>
-
-                        ·
-
-                        <a :href="selectedItem.image_credit.license_url" target="_blank" rel="noopener noreferrer">
-                            {{ selectedItem.image_credit.license }}
-                        </a>
+                <el-image v-if="selectedItem.image_url" :src="selectedItem.image_url" :alt="selectedItem.name" fit="cover" class="detail-image" />
+                <p><el-text type="info">{{ selectedItem.area_label }}</el-text></p>
+                <p>{{ selectedItem.summary }}</p>
+                <el-space wrap>
+                    <el-tag v-for="tag in selectedItem.tag_labels" :key="tag">{{ tag }}</el-tag>
+                </el-space>
+                <el-descriptions :column="1" class="section-gap">
+                    <el-descriptions-item v-if="selectedItem.address" label="地址">{{ selectedItem.address }}</el-descriptions-item>
+                    <el-descriptions-item v-if="selectedItem.price" label="参考价格">{{ selectedItem.price }}</el-descriptions-item>
+                </el-descriptions>
+                <p v-if="selectedItem.image_credit" class="muted">
+                    图片来源：
+                    <el-link :href="selectedItem.image_credit.source_url" target="_blank" rel="noopener noreferrer">{{ selectedItem.image_credit.author }}</el-link>
+                    · <el-link :href="selectedItem.image_credit.license_url" target="_blank" rel="noopener noreferrer">{{ selectedItem.image_credit.license }}</el-link>
+                </p>
+                <el-space wrap>
+                    <el-link v-if="selectedItem.source_url" :href="selectedItem.source_url" target="_blank" rel="noopener noreferrer">查看资料来源 ↗</el-link>
+                    <el-link v-if="selectedItem.navigation_url" :href="selectedItem.navigation_url" target="_blank" rel="noopener noreferrer">Google Maps 导航 ↗</el-link>
+                </el-space>
+                <el-divider />
+                <section v-loading="reviewLoading" element-loading-text="正在加载评价..." class="loading-region">
+                    <h3>用户评价</h3>
+                    <el-alert v-if="reviewError" :title="reviewError" type="error" :closable="false" show-icon />
+                    <el-alert v-if="reviewMessage" :title="reviewMessage" type="success" :closable="false" show-icon />
+                    <el-form v-if="reviewLoggedIn" label-position="top" :disabled="reviewSubmitting || reviewLoading" @submit.prevent="submitReview">
+                        <p v-if="myReview">我的评价：
+                            <el-tag :type="myReview.status === 'approved' ? 'success' : myReview.status === 'pending' ? 'warning' : 'danger'">
+                                {{ myReview.status === 'pending' ? '待审核' : myReview.status === 'approved' ? '已通过' : '已拒绝' }}
+                            </el-tag>
+                        </p>
+                        <el-form-item label="评分"><el-rate v-model="reviewRating" show-score score-template="{value}/5" /></el-form-item>
+                        <el-form-item label="评价内容">
+                            <el-input v-model="reviewBody" type="textarea" :rows="4" maxlength="500" show-word-limit placeholder="分享你的体验..." />
+                        </el-form-item>
+                        <el-button type="primary" native-type="submit" :loading="reviewSubmitting" :disabled="!reviewBody.trim() || reviewLoading">提交评价</el-button>
+                    </el-form>
+                    <el-link v-else-if="!reviewLoading" href="/accounts/login/?next=/">登录后发表评价</el-link>
+                    <h3>其他游客的评价</h3>
+                    <div v-for="review in reviews" :key="review.id">
+                        <el-divider />
+                        <el-space wrap><strong>{{ review.author }}</strong><el-rate :model-value="review.rating" disabled /></el-space>
+                        <p>{{ review.body }}</p>
                     </div>
-
-                    <a v-if="selectedItem.source_url" :href="selectedItem.source_url" target="_blank"
-                        rel="noopener noreferrer">
-                        查看资料来源 ↗
-                    </a>
-
-                    <a v-if="selectedItem.navigation_url" :href="selectedItem.navigation_url" target="_blank"
-                        rel="noopener noreferrer">
-                        Google Maps 导航 ↗
-                    </a>
-
-
-                    <!-- 评价区域 -->
-                    <section class="review-section">
-                        <h3>用户评价</h3>
-
-                        <p v-if="reviewLoading">正在加载评价...</p>
-                        <p v-if="reviewError">{{ reviewError }}</p>
-                        <p v-if="reviewMessage">{{ reviewMessage }}</p>
-
-                        <form v-if="reviewLoggedIn" @submit.prevent="submitReview">
-                            <p v-if="myReview">我的评价： {{ myReview.status === 'pending' ? '待审核' : myReview.status ===
-                                'approved' ? '已通过' : '已拒绝' }}</p>
-
-                            <div class="review-rating">
-                                <span>评分</span>
-                                <el-rate v-model="reviewRating" :disabled="reviewSubmitting" show-score
-                                    score-template="{value}/5" />
-                            </div>
-
-                            <div>
-                                <p>评价内容</p>
-
-                                <el-input v-model="reviewBody" type="textarea" :rows="4" maxlength="500" show-word-limit
-                                    placeholder="分享你的体验..." :disabled="reviewSubmitting" />
-                            </div>
-
-                            <el-button type="primary" native-type="submit" :loading="reviewSubmitting"
-                                :disabled="!reviewBody.trim() || reviewLoading">
-                                提交评价
-                            </el-button>
-                        </form>
-
-                        <p v-else><a href="/accounts/login/?next=/">登录后发表评价</a></p>
-
-                        <h3>其他游客的评价</h3>
-
-                        <div v-for="review in reviews" :key="review.id" class="review-item">
-                            <strong>{{ review.author }}</strong>
-                            <span>★ {{ review.rating }}/5</span>
-                            <p>{{ review.body }}</p>
-                        </div>
-
-                        <p v-if="!reviewLoading && !reviews.length">暂无公开评价</p>
-                    </section>
-                </div>
+                    <el-empty v-if="!reviewLoading && !reviews.length" description="暂无公开评价" :image-size="60" />
+                </section>
             </template>
         </el-dialog>
-
     </section>
 </template>
-
-<style scoped>
-.listing-detail-image {
-    display: block;
-    width: 100%;
-    max-width: 100%;
-    max-height: 300px;
-    object-fit: cover;
-}
-</style>

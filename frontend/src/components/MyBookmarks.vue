@@ -16,7 +16,6 @@ function getCsrfToken() {
     return cookie ? decodeURIComponent(cookie.split('=')[1]) : ''
 }
 
-
 // 获取收藏列表  GET
 async function loadBookmarks() {
     loading.value = true
@@ -43,9 +42,9 @@ async function loadBookmarks() {
     }
 }
 
-
 // 取消收藏 DELETE
 async function removeBookmark(item) {
+    if (removingId.value !== null) return
     removingId.value = item.id
     error.value = ''
 
@@ -68,63 +67,47 @@ async function removeBookmark(item) {
     }
 }
 
-
 // 页面初始化
 onMounted(loadBookmarks)
 </script>
 
-
-
 <template>
-    <section class="discovery-page">
-        <div class="discovery-heading">
-            <div>
-                <p class="discovery-eyebrow">MY COLLECTION</p>
-                <h2>我的收藏</h2>
-                <p>保存喜欢的澳门美食与特色文创。</p>
-            </div>
+    <section>
+        <div class="section-heading">
+            <div><p class="eyebrow">MY COLLECTION</p><h2>我的收藏</h2><p>保存喜欢的澳门美食与特色文创。</p></div>
         </div>
-
-        <p v-if="loading" class="discovery-message">正在加载收藏...</p>
-
-        <div v-else-if="needLogin" class="discovery-message">
-            <p>登录后才能查看自己的收藏。</p>
-            <a href="/accounts/login/?next=/">前往登录</a>
+        <div v-loading="loading" element-loading-text="正在加载收藏..." class="loading-region">
+            <el-empty v-if="needLogin" description="登录后才能查看自己的收藏。">
+                <el-link href="/accounts/login/?next=/" type="primary">前往登录</el-link>
+            </el-empty>
+            <template v-else>
+                <el-alert v-if="error" :title="error" type="error" :closable="false" show-icon>
+                    <el-button @click="loadBookmarks">重试</el-button>
+                </el-alert>
+                <el-row v-if="items.length" :gutter="20" class="card-row">
+                    <el-col v-for="item in items" :key="item.id" :xs="24" :sm="12" :lg="8">
+                        <el-card shadow="hover" class="content-card">
+                            <el-image :src="item.image_url || ''" :alt="item.name" fit="cover" loading="lazy" class="card-image">
+                                <template #error><div class="image-placeholder">澳门漫遊</div></template>
+                            </el-image>
+                            <el-space wrap>
+                                <el-tag>{{ item.kind === 'food' ? '地道美食' : '文创手信' }}</el-tag>
+                                <el-tag type="info">{{ item.area_label }}</el-tag>
+                            </el-space>
+                            <h3>{{ item.name }}</h3>
+                            <p class="summary">{{ item.summary }}</p>
+                            <el-space wrap>
+                                <el-text type="warning">{{ item.rating != null ? `★ ${Number(item.rating).toFixed(1)}` : '暂无评价' }}</el-text>
+                                <el-text v-if="item.price" type="info">{{ item.price }}</el-text>
+                            </el-space>
+                            <div class="section-gap">
+                                <el-button :loading="removingId === item.id" :disabled="removingId !== null" @click="removeBookmark(item)">取消收藏</el-button>
+                            </div>
+                        </el-card>
+                    </el-col>
+                </el-row>
+                <el-empty v-else-if="!loading && !error" description="你还没有收藏任何内容，去探索澳门吧！" />
+            </template>
         </div>
-
-        <p v-else-if="error" class="discovery-message error">
-            {{ error }}
-            <button @click="loadBookmarks">重试</button>
-        </p>
-
-        <div v-else-if="items.length" class="discovery-grid">
-            <article v-for="item in items" :key="item.id" class="discovery-card">
-                <div class="discovery-image">
-                    <img v-if="item.image_url" :src="item.image_url" :alt="item.name" loading="lazy">
-                    <div v-else class="image-placeholder">澳门漫遊</div>
-
-                    <span class="discovery-area">{{ item.area_label }}</span>
-                </div>
-
-                <div class="discovery-card-body">
-                    <p class="discovery-label">{{ item.kind === 'food' ? '地道美食' : '文创手信' }}</p>
-                    <h3>{{ item.name }}</h3>
-
-                    <p class="discovery-summary">{{ item.summary }}</p>
-
-                    <div class="discovery-meta">
-                        <span>{{ item.rating != null ? `★ ${Number(item.rating).toFixed(1)}` : '暂无评价'}}</span>
-                        <span v-if="item.price">{{ item.price }}</span>
-                    </div>
-
-                    <button class="bookmark-remove-button" :disabled="removingId === item.id" @click="removeBookmark(item)">
-                        {{ removingId === item.id ? '处理中...' : '取消收藏' }}
-                    </button>
-                </div>
-            </article>
-        </div>
-
-        <div v-else class="discovery-message"> 你还没有收藏任何内容，去探索澳门吧！</div>
-
     </section>
 </template>
