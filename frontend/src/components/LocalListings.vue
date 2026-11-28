@@ -444,7 +444,8 @@ onMounted(async () => {
             :show-close="!reviewSubmitting" append-to-body>
             <template v-if="selectedItem">
 
-                <img v-if="selectedItem.image_url" :src="selectedItem.image_url" :alt="selectedItem.name">
+                <img v-if="selectedItem.image_url" :src="selectedItem.image_url" :alt="selectedItem.name"
+                    class="listing-detail-image">
 
                 <div class="discovery-modal-body">
                     <p class="discovery-label">{{ selectedItem.area_label }}</p>
@@ -527,3 +528,13 @@ onMounted(async () => {
 
     </section>
 </template>
+
+<style scoped>
+.listing-detail-image {
+    display: block;
+    width: 100%;
+    max-width: 100%;
+    max-height: 300px;
+    object-fit: cover;
+}
+</style>

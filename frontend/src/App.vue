@@ -172,7 +172,7 @@ function resetFilters() {
     category.value = ''
     theme.value = ''
     lessKnownOnly.value = false
-    loadAllAttractions()
+    loadAttractions()
 }
 
 
